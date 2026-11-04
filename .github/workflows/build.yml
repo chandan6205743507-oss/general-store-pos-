@@ -28,11 +28,13 @@ jobs:
       - name: Generate Android Scaffold
         run: flutter create . --project-name general_store_pos --platforms=android --org com.generalstore.pos
 
-      - name: Configure Android Camera & MinSDK
+      - name: Configure Android Kotlin, Camera & MinSDK
         run: |
           sed -i 's/minSdkVersion = flutter.minSdkVersion/minSdkVersion = 21/' android/app/build.gradle || true
           sed -i 's/minSdk = flutter.minSdkVersion/minSdk = 21/' android/app/build.gradle || true
           sed -i 's/<application/<uses-permission android:name="android.permission.CAMERA"\/>\n    <application/' android/app/src/main/AndroidManifest.xml || true
+          sed -i 's/ext.kotlin_version = .*/ext.kotlin_version = "1.9.24"/' android/build.gradle || true
+          sed -i 's/kotlin("android") version "[^"]*"/kotlin("android") version "1.9.24"/' android/settings.gradle || true
 
       - name: Install dependencies
         run: flutter pub get
