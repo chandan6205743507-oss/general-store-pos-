@@ -7,11 +7,12 @@ class ProductItem {
   final String id;
   String name;
   String barcode;
-  double price;        // Grahak ko bechne ka rate (Selling Price)
-  double costPrice;    // Khareed rate (Cost Price for Profit calculation)
-  double stock;        // Dukan me bacha maal (Pcs ya Kg)
+  double price;
+  double costPrice;
+  double stock;
   ItemType type;
-  bool isPending;      // Agar billing ke dauran quick add hua ho
+  bool isPending;
+  String imageUrl;
 
   ProductItem({
     required this.id,
@@ -22,6 +23,7 @@ class ProductItem {
     this.stock = 0.0,
     required this.type,
     this.isPending = false,
+    this.imageUrl = '',
   });
 
   Map<String, dynamic> toMap() => {
@@ -33,6 +35,7 @@ class ProductItem {
     'stock': stock,
     'type': type.index,
     'isPending': isPending,
+    'imageUrl': imageUrl,
   };
 
   factory ProductItem.fromMap(Map<String, dynamic> map) => ProductItem(
@@ -44,6 +47,7 @@ class ProductItem {
     stock: (map['stock'] as num).toDouble(),
     type: ItemType.values[map['type'] ?? 0],
     isPending: map['isPending'] ?? false,
+    imageUrl: map['imageUrl'] ?? '',
   );
 }
 
