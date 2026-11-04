@@ -1,5 +1,7 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
+import 'package:http/http.dart' as http;
 import 'models.dart';
 import 'receipt_view.dart';
 
@@ -51,7 +53,7 @@ class _BillScreenState extends State<BillScreen> {
         _addToCart(product, qty: 1.0);
       }
     } else {
-      _showNewItemPriceDialog(code);
+      _showNewItemDialog(code);
     }
   }
 
@@ -70,8 +72,29 @@ class _BillScreenState extends State<BillScreen> {
     });
   }
 
-  void _showNewItemPriceDialog(String barcode) {
+  Future> _fetchOnlineDetails(String barcode) async {
+    try {
+      final res = await http.get(Uri.parse('https://world.openfoodfacts.org/api/v0/product/$barcode.json')).timeout(const Duration(seconds: 3));
+      if (res.statusCode == 200) {
+        final d = jsonDecode(res.body);
+        if (d['status'] == 1 && d['product'] != null) {
+          return {
+            'name': d['product']['product_name'] ?? '',
+            'image': d['product']['image_front_small_url'] ?? '',
+          };
+        }
+      }
+    } catch (_) {}
+    return {'name': '', 'image': ''};
+  }
+
+  void _showNewItemDialog(String barcode) async {
+    final online = await _fetchOnlineDetails(barcode);
+    if (!mounted) return;
+
+    final nameCtrl = TextEditingController(text: online['name']!.isNotEmpty ? online['name'] : 'Item $barcode');
     final priceCtrl = TextEditingController();
+
     showDialog(
       context: context,
       barrierDismissible: false,
@@ -83,13 +106,21 @@ class _BillScreenState extends State<BillScreen> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text('Barcode: $barcode', style: const TextStyle(color: Colors.grey, fontSize: 13)),
-            const SizedBox(height: 12),
+            const SizedBox(height: 10),
+            TextField(
+              controller: nameCtrl,
+              decoration: const InputDecoration(
+                labelText: 'Item Name*',
+                border: OutlineInputBorder(),
+              ),
+            ),
+            const SizedBox(height: 10),
             TextField(
               controller: priceCtrl,
               keyboardType: const TextInputType.numberWithOptions(decimal: true),
               autofocus: true,
               decoration: const InputDecoration(
-                labelText: 'Enter Selling Price (₹)*',
+                labelText: 'Selling Price (₹)*',
                 border: OutlineInputBorder(),
                 prefixText: '₹ ',
               ),
@@ -102,16 +133,18 @@ class _BillScreenState extends State<BillScreen> {
             style: ElevatedButton.styleFrom(backgroundColor: Colors.teal, foregroundColor: Colors.white),
             onPressed: () {
               final p = double.tryParse(priceCtrl.text) ?? 0.0;
-              if (p > 0) {
+              final name = nameCtrl.text.trim();
+              if (p > 0 && name.isNotEmpty) {
                 final tempProduct = ProductItem(
                   id: 'item_${DateTime.now().millisecondsSinceEpoch}',
-                  name: 'Product ($barcode)',
+                  name: name,
                   barcode: barcode,
                   price: p,
                   costPrice: 0.0,
                   stock: 0.0,
                   type: ItemType.piece,
                   isPending: true,
+                  imageUrl: online['image'] ?? '',
                 );
                 widget.onQuickItemAdded(tempProduct);
                 _addToCart(tempProduct, qty: 1.0);
@@ -224,35 +257,35 @@ class _BillScreenState extends State<BillScreen> {
               ),
             ],
           ),
-          actions: [
-            TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
-            ElevatedButton(
-              style: ElevatedButton.styleFrom(backgroundColor: Colors.amber.shade700, foregroundColor: Colors.white),
-              onPressed: () {
-                if (phoneCtrl.text.trim().isEmpty) return;
-                final sale = SaleRecord(
-                  id: DateTime.now().millisecondsSinceEpoch.toString(),
-                  dateTime: DateTime.now(),
-                  items: List.from(_cart),
-                  totalAmount: _cartTotal,
-                  totalProfit: _cart.fold(0.0, (s, i) => s + i.profit),
-                  paymentMethod: PaymentMethod.udhaar,
-                  cashReceived: 0.0,
-                  changeReturned: 0.0,
-                  customer: CustomerDetails(
-                    name: nameCtrl.text.trim().isEmpty ? 'Customer' : nameCtrl.text.trim(),
-                    phone: phoneCtrl.text.trim(),
-                  ),
-                  isPaid: false,
-                );
-                widget.onSaleCompleted(sale);
-                Navigator.pop(ctx);
-                _openReceipt(sale);
-              },
-              child: const Text('Save to Udhaar'),
-            ),
-          ],
         ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.amber.shade800, foregroundColor: Colors.white),
+            onPressed: () {
+              if (phoneCtrl.text.trim().isEmpty) return;
+              final sale = SaleRecord(
+                id: DateTime.now().millisecondsSinceEpoch.toString(),
+                dateTime: DateTime.now(),
+                items: List.from(_cart),
+                totalAmount: _cartTotal,
+                totalProfit: _cart.fold(0.0, (s, i) => s + i.profit),
+                paymentMethod: PaymentMethod.udhaar,
+                cashReceived: 0.0,
+                changeReturned: 0.0,
+                customer: CustomerDetails(
+                  name: nameCtrl.text.trim().isEmpty ? 'Customer' : nameCtrl.text.trim(),
+                  phone: phoneCtrl.text.trim(),
+                ),
+                isPaid: false,
+              );
+              widget.onSaleCompleted(sale);
+              Navigator.pop(ctx);
+              _openReceipt(sale);
+            },
+            child: const Text('Save to Udhaar'),
+          ),
+        ],
       );
     } else {
       final sale = SaleRecord(
@@ -370,6 +403,13 @@ class _BillScreenState extends State<BillScreen> {
                     itemBuilder: (ctx, i) {
                       final item = _cart[i];
                       return ListTile(
+                        leading: item.product.imageUrl.isNotEmpty
+                            ? ClipRRect(
+                                borderRadius: BorderRadius.circular(6),
+                                child: Image.network(item.product.imageUrl, width: 40, height: 40, fit: BoxFit.cover,
+                                    errorBuilder: (_, __, ___) => const Icon(Icons.fastfood, color: Colors.teal)),
+                              )
+                            : null,
                         title: Text(item.product.name, style: const TextStyle(fontWeight: FontWeight.bold)),
                         subtitle: Text(
                           '₹${item.customPrice} x ${item.product.type == ItemType.loose ? item.quantity.toStringAsFixed(2) : item.quantity.toInt()} ${item.product.type == ItemType.loose ? 'kg' : 'pcs'}',
