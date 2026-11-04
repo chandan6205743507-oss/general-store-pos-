@@ -1,5 +1,5 @@
 name: general_store_pos
-description: "A comprehensive offline General Store POS app in Flutter."
+description: "A General Store POS & Inventory Flutter application"
 publish_to: "none"
 version: 1.0.0+1
 
@@ -10,6 +10,8 @@ dependencies:
   flutter:
     sdk: flutter
   intl: ^0.19.0
+  mobile_scanner: ^5.2.3
+  shared_preferences: ^2.2.2
 
 dev_dependencies:
   flutter_test:
@@ -18,4 +20,3 @@ dev_dependencies:
 
 flutter:
   uses-material-design: true
-  
