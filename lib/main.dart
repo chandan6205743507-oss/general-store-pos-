@@ -17,11 +17,12 @@ class PosApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'Kirana POS',
+      title: 'Vanik POS',
       debugShowCheckedModeBanner: false,
       theme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(seedColor: Colors.teal),
+        primarySwatch: Colors.teal,
         useMaterial3: true,
+        scaffoldBackgroundColor: const Color(0xFFF7F9FA),
       ),
       home: const MainNavigationScreen(),
     );
@@ -38,76 +39,74 @@ class MainNavigationScreen extends StatefulWidget {
 class _MainNavigationScreenState extends State<MainNavigationScreen> {
   int _currentIndex = 0;
   List<ProductItem> _inventory = [];
-  List<SaleRecord> _salesHistory = [];
+  List<SaleRecord> _sales = [];
   bool _isLoading = true;
 
   @override
   void initState() {
     super.initState();
-    _loadDataFromStorage();
+    _loadLocalData();
   }
 
-  Future<void> _loadDataFromStorage() async {
+  Future<void> _loadLocalData() async {
     final prefs = await SharedPreferences.getInstance();
     final invString = prefs.getString('pos_inventory');
     final salesString = prefs.getString('pos_sales');
 
-    setState(() {
-      if (invString != null) {
-        final List decoded = jsonDecode(invString);
-        _inventory = decoded.map((m) => ProductItem.fromMap(m)).toList();
-      } else {
-        // Shuruat ke default items
-        _inventory = [
-          ProductItem(
-            id: '1',
-            name: 'Good Day Biscuit',
-            barcode: '8901030000001',
-            price: 10.0,
-            costPrice: 8.5,
-            stock: 24.0,
-            type: ItemType.piece,
-          ),
-          ProductItem(
-            id: '2',
-            name: 'Sugar (Chini)',
-            barcode: 'L_sugar',
-            price: 44.0,
-            costPrice: 38.0,
-            stock: 50.0,
-            type: ItemType.loose,
-          ),
-        ];
-      }
+    if (invString != null) {
+      final List decoded = jsonDecode(invString);
+      _inventory = decoded.map((e) => ProductItem.fromMap(e)).toList();
+    } else {
+      _inventory = [
+        ProductItem(
+          id: '1',
+          name: 'Good Day Biscuit',
+          barcode: '8901063012240',
+          price: 10.0,
+          costPrice: 8.5,
+          stock: 24.0,
+          type: ItemType.piece,
+        ),
+        ProductItem(
+          id: '2',
+          name: 'Sugar (Chini)',
+          barcode: 'L_SUGAR',
+          price: 44.0,
+          costPrice: 38.0,
+          stock: 50.0,
+          type: ItemType.loose,
+        ),
+      ];
+    }
 
-      if (salesString != null) {
-        final List decoded = jsonDecode(salesString);
-        _salesHistory = decoded.map((m) => SaleRecord.fromMap(m)).toList();
-      }
-      _isLoading = false;
-    });
+    if (salesString != null) {
+      final List decodedSales = jsonDecode(salesString);
+      _sales = decodedSales.map((e) => SaleRecord.fromMap(e)).toList();
+    }
+
+    setState(() => _isLoading = false);
   }
 
   Future<void> _saveInventory() async {
     final prefs = await SharedPreferences.getInstance();
-    final invJson = jsonEncode(_inventory.map((i) => i.toMap()).toList());
-    await prefs.setString('pos_inventory', invJson);
+    final encoded = jsonEncode(_inventory.map((e) => e.toMap()).toList());
+    await prefs.setString('pos_inventory', encoded);
   }
 
   Future<void> _saveSales() async {
     final prefs = await SharedPreferences.getInstance();
-    final salesJson = jsonEncode(_salesHistory.map((s) => s.toMap()).toList());
-    await prefs.setString('pos_sales', salesJson);
+    final encoded = jsonEncode(_sales.map((e) => e.toMap()).toList());
+    await prefs.setString('pos_sales', encoded);
   }
 
-  void _handleSaleCompleted(SaleRecord sale) {
+  void _onSaleCompleted(SaleRecord sale) {
     setState(() {
-      _salesHistory.insert(0, sale);
-      // Stock kam karein
+      _sales.insert(0, sale);
       for (final cartItem in sale.items) {
-        final idx = _inventory.indexWhere((p) => p.barcode == cartItem.product.barcode);
-        if (idx >= 0) {
-          _inventory[idx].stock = (_inventory[idx].stock - cartItem.quantity).clamp(0.0, double.infinity);
+        final index = _inventory.indexWhere((p) => p.barcode == cartItem.product.barcode);
+        if (index >= 0) {
+          _inventory[index].stock -= cartItem.quantity;
+          if (_inventory[index].stock < 0) _inventory[index].stock = 0;
         }
       }
     });
@@ -115,31 +114,24 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
     _saveInventory();
   }
 
-  void _handleAddProduct(ProductItem item) {
+  void _onAddProduct(ProductItem product) {
     setState(() {
-      _inventory.insert(0, item);
-    });
-    _saveInventory();
-  }
-
-  void _handleUpdateStock(String id, double newStock) {
-    setState(() {
-      final idx = _inventory.indexWhere((p) => p.id == id);
-      if (idx >= 0) {
-        _inventory[idx].stock = newStock;
+      final existingIndex = _inventory.indexWhere((p) => p.barcode == product.barcode);
+      if (existingIndex >= 0) {
+        _inventory[existingIndex] = product;
+      } else {
+        _inventory.add(product);
       }
     });
     _saveInventory();
   }
 
-  void _handleMarkPaid(String saleId) {
+  void _onUpdateStock(String barcode, double addedStock) {
     setState(() {
-      final idx = _salesHistory.indexWhere((s) => s.id == saleId);
-      if (idx >= 0) {
-        _salesHistory[idx].isPaid = true;
-      }
+      final item = _inventory.firstWhere((p) => p.barcode == barcode);
+      item.stock += addedStock;
     });
-    _saveSales();
+    _saveInventory();
   }
 
   @override
@@ -150,44 +142,39 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
       );
     }
 
-    final pages = [
+    final screens = [
       BillScreen(
         inventory: _inventory,
-        onSaleCompleted: _handleSaleCompleted,
-        onQuickItemAdded: _handleAddProduct,
+        onSaleCompleted: _onSaleCompleted,
+        onQuickItemAdded: _onAddProduct,
       ),
       ShopScreen(
         inventory: _inventory,
-        onAddProduct: _handleAddProduct,
-        onUpdateStock: _handleUpdateStock,
+        onAddProduct: _onAddProduct,
+        onUpdateStock: _onUpdateStock,
       ),
       SalesScreen(
-        salesHistory: _salesHistory,
-        onMarkPaid: _handleMarkPaid,
+        sales: _sales,
+        onPaymentStatusChanged: (saleId, isPaid) {
+          setState(() {
+            final sale = _sales.firstWhere((s) => s.id == saleId);
+            sale.isPaid = isPaid;
+          });
+          _saveSales();
+        },
       ),
     ];
 
     return Scaffold(
-      body: pages[_currentIndex],
+      body: screens[_currentIndex],
       bottomNavigationBar: NavigationBar(
         selectedIndex: _currentIndex,
         onDestinationSelected: (idx) => setState(() => _currentIndex = idx),
+        indicatorColor: Colors.teal.shade100,
         destinations: const [
-          NavigationDestination(
-            icon: Icon(Icons.point_of_sale_outlined),
-            selectedIcon: Icon(Icons.point_of_sale, color: Colors.teal),
-            label: 'Billing',
-          ),
-          NavigationDestination(
-            icon: Icon(Icons.inventory_2_outlined),
-            selectedIcon: Icon(Icons.inventory_2, color: Colors.teal),
-            label: 'Shop & Stock',
-          ),
-          NavigationDestination(
-            icon: Icon(Icons.receipt_long_outlined),
-            selectedIcon: Icon(Icons.receipt_long, color: Colors.teal),
-            label: 'Sales Ledger',
-          ),
+          NavigationDestination(icon: Icon(Icons.point_of_sale), label: 'Billing'),
+          NavigationDestination(icon: Icon(Icons.store), label: 'Shop & Stock'),
+          NavigationDestination(icon: Icon(Icons.receipt_long), label: 'Sales Ledger'),
         ],
       ),
     );
