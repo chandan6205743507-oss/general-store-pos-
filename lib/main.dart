@@ -7,22 +7,21 @@ import 'package:http/http.dart' as http;
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
-  runApp(const VanikPosApp());
+  runApp(const MaterialApp(
+    title: 'Vanik POS',
+    debugShowCheckedModeBanner: false,
+    home: VanikMainApp(),
+  ));
 }
 
 enum ItemType { piece, loose }
-enum PaymentMethod { cash, online, udhaar }
+enum PaymentMethod { cash, udhaar }
 
 class ProductItem {
-  final String id;
-  String name;
-  String barcode;
-  double price;
-  double costPrice;
-  double stock;
+  String id, name, barcode, imageUrl;
+  double price, costPrice, stock;
   ItemType type;
   bool isPending;
-  String imageUrl;
 
   ProductItem({
     required this.id,
@@ -48,604 +47,410 @@ class ProductItem {
     'imageUrl': imageUrl,
   };
 
-  factory ProductItem.fromMap(Map<String, dynamic> map) => ProductItem(
-    id: map['id'],
-    name: map['name'],
-    barcode: map['barcode'],
-    price: (map['price'] as num).toDouble(),
-    costPrice: (map['costPrice'] as num).toDouble(),
-    stock: (map['stock'] as num).toDouble(),
-    type: ItemType.values[map['type'] ?? 0],
-    isPending: map['isPending'] ?? false,
-    imageUrl: map['imageUrl'] ?? '',
+  factory ProductItem.fromMap(Map<String, dynamic> m) => ProductItem(
+    id: m['id'],
+    name: m['name'],
+    barcode: m['barcode'],
+    price: (m['price'] as num).toDouble(),
+    costPrice: (m['costPrice'] as num).toDouble(),
+    stock: (m['stock'] as num).toDouble(),
+    type: ItemType.values[m['type'] ?? 0],
+    isPending: m['isPending'] ?? false,
+    imageUrl: m['imageUrl'] ?? '',
   );
 }
 
 class CartItem {
   final ProductItem product;
-  double quantity;
-  double customPrice;
-
-  CartItem({
-    required this.product,
-    required this.quantity,
-    required this.customPrice,
-  });
-
-  double get total => customPrice * quantity;
-  double get profit => (customPrice - product.costPrice) * quantity;
+  double qty, price;
+  CartItem({required this.product, required this.qty, required this.price});
+  double get total => price * qty;
+  double get profit => (price - product.costPrice) * qty;
 
   Map<String, dynamic> toMap() => {
     'product': product.toMap(),
-    'quantity': quantity,
-    'customPrice': customPrice,
+    'qty': qty,
+    'price': price,
   };
-
-  factory CartItem.fromMap(Map<String, dynamic> map) => CartItem(
-    product: ProductItem.fromMap(map['product']),
-    quantity: (map['quantity'] as num).toDouble(),
-    customPrice: (map['customPrice'] as num).toDouble(),
+  factory CartItem.fromMap(Map<String, dynamic> m) => CartItem(
+    product: ProductItem.fromMap(m['product']),
+    qty: (m['qty'] as num).toDouble(),
+    price: (m['price'] as num).toDouble(),
   );
 }
 
 class SaleRecord {
-  final String id;
-  final DateTime dateTime;
-  final List<CartItem> items;
-  final double totalAmount;
-  final double totalProfit;
-  final PaymentMethod paymentMethod;
-  final String customerPhone;
-  final String customerName;
+  String id, phone, name;
+  DateTime date;
+  List<CartItem> items;
+  double total, profit;
+  PaymentMethod method;
   bool isPaid;
 
   SaleRecord({
     required this.id,
-    required this.dateTime,
+    required this.date,
     required this.items,
-    required this.totalAmount,
-    required this.totalProfit,
-    required this.paymentMethod,
-    this.customerPhone = '',
-    this.customerName = '',
+    required this.total,
+    required this.profit,
+    required this.method,
+    this.phone = '',
+    this.name = '',
     this.isPaid = true,
   });
 
   Map<String, dynamic> toMap() => {
     'id': id,
-    'dateTime': dateTime.toIso8601String(),
+    'date': date.toIso8601String(),
     'items': items.map((x) => x.toMap()).toList(),
-    'totalAmount': totalAmount,
-    'totalProfit': totalProfit,
-    'paymentMethod': paymentMethod.index,
-    'customerPhone': customerPhone,
-    'customerName': customerName,
+    'total': total,
+    'profit': profit,
+    'method': method.index,
+    'phone': phone,
+    'name': name,
     'isPaid': isPaid,
   };
 
-  factory SaleRecord.fromMap(Map<String, dynamic> map) => SaleRecord(
-    id: map['id'],
-    dateTime: DateTime.parse(map['dateTime']),
-    items: (map['items'] as List).map((x) => CartItem.fromMap(x)).toList(),
-    totalAmount: (map['totalAmount'] as num).toDouble(),
-    totalProfit: (map['totalProfit'] as num?)?.toDouble() ?? 0.0,
-    paymentMethod: PaymentMethod.values[map['paymentMethod'] ?? 0],
-    customerPhone: map['customerPhone'] ?? '',
-    customerName: map['customerName'] ?? '',
-    isPaid: map['isPaid'] ?? true,
+  factory SaleRecord.fromMap(Map<String, dynamic> m) => SaleRecord(
+    id: m['id'],
+    date: DateTime.parse(m['date']),
+    items: (m['items'] as List).map((x) => CartItem.fromMap(x)).toList(),
+    total: (m['total'] as num).toDouble(),
+    profit: (m['profit'] as num).toDouble(),
+    method: PaymentMethod.values[m['method'] ?? 0],
+    phone: m['phone'] ?? '',
+    name: m['name'] ?? '',
+    isPaid: m['isPaid'] ?? true,
   );
 }
 
-class VanikPosApp extends StatelessWidget {
-  const VanikPosApp({super.key});
-
+class VanikMainApp extends StatefulWidget {
+  const VanikMainApp({super.key});
   @override
-  Widget build(BuildContext context) {
-    return MaterialApp(
-      title: 'Vanik POS',
-      debugShowCheckedModeBanner: false,
-      theme: ThemeData(
-        primarySwatch: Colors.teal,
-        useMaterial3: true,
-        scaffoldBackgroundColor: const Color(0xFFF7F9FA),
-        appBarTheme: const AppBarTheme(
-          backgroundColor: Colors.teal,
-          foregroundColor: Colors.white,
-          centerTitle: false,
-        ),
-      ),
-      home: const MainHomeScreen(),
-    );
-  }
+  State<VanikMainApp> createState() => _VanikMainAppState();
 }
 
-class MainHomeScreen extends StatefulWidget {
-  const MainHomeScreen({super.key});
-
-  @override
-  State<MainHomeScreen> createState() => _MainHomeScreenState();
-}
-
-class _MainHomeScreenState extends State<MainHomeScreen> {
-  int _tabIndex = 0;
-  List<ProductItem> _inventory = [];
+class _VanikMainAppState extends State<VanikMainApp> {
+  int _idx = 0;
+  List<ProductItem> _items = [];
   List<SaleRecord> _sales = [];
-  bool _isLoading = true;
-  String _shopCode = 'VK-7842';
+  bool _load = true;
+  final String _shopCode = 'VK-7842';
 
   @override
   void initState() {
     super.initState();
-    _loadData();
+    _fetchStorage();
   }
 
-  Future<void> _loadData() async {
-    final prefs = await SharedPreferences.getInstance();
-    final invData = prefs.getString('vanik_inventory');
-    final salesData = prefs.getString('vanik_sales');
-    _shopCode = prefs.getString('vanik_shop_code') ?? 'VK-7842';
-
-    if (invData != null) {
-      final List dec = jsonDecode(invData);
-      _inventory = dec.map((e) => ProductItem.fromMap(e)).toList();
+  Future<void> _fetchStorage() async {
+    final p = await SharedPreferences.getInstance();
+    final sInv = p.getString('v_inv');
+    final sSales = p.getString('v_sales');
+    if (sInv != null) {
+      _items = (jsonDecode(sInv) as List).map((e) => ProductItem.fromMap(e)).toList();
     } else {
-      _inventory = [
-        ProductItem(
-          id: '1',
-          name: 'Good Day Biscuit',
-          barcode: '8901063012240',
-          price: 10.0,
-          costPrice: 8.5,
-          stock: 24.0,
-          type: ItemType.piece,
-        ),
-        ProductItem(
-          id: '2',
-          name: 'Sugar (Chini)',
-          barcode: 'L_SUGAR',
-          price: 44.0,
-          costPrice: 38.0,
-          stock: 50.0,
-          type: ItemType.loose,
-        ),
+      _items = [
+        ProductItem(id: '1', name: 'Good Day Biscuit', barcode: '8901063012240', price: 10, costPrice: 8.5, stock: 20, type: ItemType.piece),
+        ProductItem(id: '2', name: 'Sugar (Chini)', barcode: 'L_SUGAR', price: 44, costPrice: 38, stock: 50, type: ItemType.loose),
       ];
     }
-
-    if (salesData != null) {
-      final List decSales = jsonDecode(salesData);
-      _sales = decSales.map((e) => SaleRecord.fromMap(e)).toList();
+    if (sSales != null) {
+      _sales = (jsonDecode(sSales) as List).map((e) => SaleRecord.fromMap(e)).toList();
     }
-
-    setState(() => _isLoading = false);
+    setState(() => _load = false);
   }
 
-  Future<void> _saveData() async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setString('vanik_inventory', jsonEncode(_inventory.map((e) => e.toMap()).toList()));
-    await prefs.setString('vanik_sales', jsonEncode(_sales.map((e) => e.toMap()).toList()));
+  Future<void> _sync() async {
+    final p = await SharedPreferences.getInstance();
+    await p.setString('v_inv', jsonEncode(_items.map((e) => e.toMap()).toList()));
+    await p.setString('v_sales', jsonEncode(_sales.map((e) => e.toMap()).toList()));
   }
 
-  void _addOrUpdateProduct(ProductItem item) {
+  void _saveProduct(ProductItem item) {
     setState(() {
-      final idx = _inventory.indexWhere((p) => p.barcode == item.barcode);
-      if (idx >= 0) {
-        _inventory[idx] = item;
+      final i = _items.indexWhere((x) => x.barcode == item.barcode);
+      if (i >= 0) {
+        _items[i] = item;
       } else {
-        _inventory.insert(0, item);
+        _items.insert(0, item);
       }
     });
-    _saveData();
+    _sync();
   }
 
-  void _completeSale(SaleRecord sale) {
+  void _addSale(SaleRecord s) {
     setState(() {
-      _sales.insert(0, sale);
-      for (final cartItem in sale.items) {
-        final idx = _inventory.indexWhere((p) => p.barcode == cartItem.product.barcode);
-        if (idx >= 0) {
-          _inventory[idx].stock -= cartItem.quantity;
-          if (_inventory[idx].stock < 0) _inventory[idx].stock = 0;
+      _sales.insert(0, s);
+      for (final it in s.items) {
+        final i = _items.indexWhere((x) => x.barcode == it.product.barcode);
+        if (i >= 0) {
+          _items[i].stock -= it.qty;
+          if (_items[i].stock < 0) _items[i].stock = 0;
         }
       }
     });
-    _saveData();
+    _sync();
   }
 
   @override
   Widget build(BuildContext context) {
-    if (_isLoading) {
+    if (_load) {
       return const Scaffold(body: Center(child: CircularProgressIndicator(color: Colors.teal)));
     }
-
-    final pages = [
-      BillingTabView(
-        inventory: _inventory,
-        onSaleCompleted: _completeSale,
-        onQuickAdd: _addOrUpdateProduct,
-      ),
-      ShopTabView(
-        inventory: _inventory,
-        onSaveProduct: _addOrUpdateProduct,
-      ),
-      SalesLedgerTabView(
-        sales: _sales,
-        onTogglePaid: (id, paid) {
-          setState(() {
-            final s = _sales.firstWhere((x) => x.id == id);
-            s.isPaid = paid;
-          });
-          _saveData();
-        },
-      ),
-      ProfileTabView(shopCode: _shopCode),
+    final tabs = [
+      _BillingView(items: _items, onSale: _addSale, onQuickAdd: _saveProduct),
+      _ShopView(items: _items, onSave: _saveProduct),
+      _SalesView(sales: _sales, onStatus: (id, paid) {
+        setState(() => _sales.firstWhere((x) => x.id == id).isPaid = paid);
+        _sync();
+      }),
+      _SyncView(code: _shopCode),
     ];
 
     return Scaffold(
-      body: pages[_tabIndex],
+      body: tabs[_idx],
       bottomNavigationBar: NavigationBar(
-        selectedIndex: _tabIndex,
-        onDestinationSelected: (idx) => setState(() => _tabIndex = idx),
+        selectedIndex: _idx,
+        onDestinationSelected: (i) => setState(() => _idx = i),
         indicatorColor: Colors.teal.shade100,
         destinations: const [
           NavigationDestination(icon: Icon(Icons.point_of_sale), label: 'Billing'),
           NavigationDestination(icon: Icon(Icons.inventory_2_outlined), label: 'Shop & Stock'),
           NavigationDestination(icon: Icon(Icons.receipt_long), label: 'Sales Ledger'),
-          NavigationDestination(icon: Icon(Icons.person_outline), label: 'Profile & Sync'),
+          NavigationDestination(icon: Icon(Icons.sync), label: 'Sync'),
         ],
       ),
     );
   }
 }
 
-class BillingTabView extends StatefulWidget {
-  final List<ProductItem> inventory;
-  final Function(SaleRecord) onSaleCompleted;
+class _BillingView extends StatefulWidget {
+  final List<ProductItem> items;
+  final Function(SaleRecord) onSale;
   final Function(ProductItem) onQuickAdd;
-
-  const BillingTabView({
-    super.key,
-    required this.inventory,
-    required this.onSaleCompleted,
-    required this.onQuickAdd,
-  });
-
+  const _BillingView({required this.items, required this.onSale, required this.onQuickAdd});
   @override
-  State<BillingTabView> createState() => _BillingTabViewState();
+  State<_BillingView> createState() => _BillingViewState();
 }
 
-class _BillingTabViewState extends State<BillingTabView> {
+class _BillingViewState extends State<_BillingView> {
   final List<CartItem> _cart = [];
-  bool _scannerActive = false;
-  DateTime _lastDetect = DateTime.now();
+  bool _cam = false;
+  DateTime _last = DateTime.now();
 
-  double get _cartTotal => _cart.fold(0, (sum, i) => sum + i.total);
+  double get _total => _cart.fold(0, (s, i) => s + i.total);
 
-  Future> _fetchOnlineInfo(String barcode) async {
-    try {
-      final res = await http.get(Uri.parse('https://world.openfoodfacts.org/api/v0/product/$barcode.json')).timeout(const Duration(seconds: 3));
-      if (res.statusCode == 200) {
-        final d = jsonDecode(res.body);
-        if (d['status'] == 1 && d['product'] != null) {
-          return {
-            'name': d['product']['product_name'] ?? '',
-            'image': d['product']['image_front_small_url'] ?? '',
-          };
-        }
-      }
-    } catch (_) {}
-    return {'name': '', 'image': ''};
-  }
-
-  void _onDetect(BarcodeCapture capture) {
-    final now = DateTime.now();
-    if (now.difference(_lastDetect).inMilliseconds < 1500) return;
-    _lastDetect = now;
-
-    for (final b in capture.barcodes) {
-      final code = b.rawValue;
-      if (code != null && code.isNotEmpty) {
-        _handleBarcode(code);
-        break;
-      }
-    }
-  }
-
-  void _handleBarcode(String code) {
-    final match = widget.inventory.where((p) => p.barcode == code).toList();
-    if (match.isNotEmpty) {
-      final item = match.first;
-      if (item.type == ItemType.loose) {
-        _promptLooseQty(item);
+  Future<void> _checkBarcode(String code) async {
+    final m = widget.items.where((x) => x.barcode == code).toList();
+    if (m.isNotEmpty) {
+      if (m.first.type == ItemType.loose) {
+        _looseDialog(m.first);
       } else {
-        _addToCart(item, 1.0);
+        _addCart(m.first, 1);
       }
     } else {
-      _promptNewItem(code);
+      String autoName = '';
+      try {
+        final res = await http.get(Uri.parse('https://world.openfoodfacts.org/api/v0/product/$code.json')).timeout(const Duration(seconds: 2));
+        if (res.statusCode == 200) {
+          autoName = jsonDecode(res.body)['product']?['product_name'] ?? '';
+        }
+      } catch (_) {}
+      if (!mounted) return;
+      final nameCtrl = TextEditingController(text: autoName);
+      final priceCtrl = TextEditingController();
+      showDialog(
+        context: context,
+        builder: (c) => AlertDialog(
+          title: const Text('New Item Scanned', style: TextStyle(color: Colors.teal)),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text('Barcode: $code'),
+              TextField(controller: nameCtrl, decoration: const InputDecoration(labelText: 'Product Name*')),
+              TextField(controller: priceCtrl, keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: 'Selling Price (₹)*')),
+            ],
+          ),
+          actions: [
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(backgroundColor: Colors.teal, foregroundColor: Colors.white),
+              onPressed: () {
+                final p = double.tryParse(priceCtrl.text) ?? 0;
+                final nm = nameCtrl.text.trim().isNotEmpty ? nameCtrl.text.trim() : 'Item $code';
+                if (p > 0) {
+                  final newItem = ProductItem(id: 'i_${DateTime.now().millisecondsSinceEpoch}', name: nm, barcode: code, price: p, type: ItemType.piece, isPending: true);
+                  widget.onQuickAdd(newItem);
+                  _addCart(newItem, 1);
+                  Navigator.pop(c);
+                }
+              },
+              child: const Text('Add to Bill'),
+            )
+          ],
+        ),
+      );
     }
   }
 
-  void _addToCart(ProductItem p, double qty) {
+  void _addCart(ProductItem p, double q) {
     setState(() {
-      final idx = _cart.indexWhere((c) => c.product.barcode == p.barcode);
-      if (idx >= 0) {
-        _cart[idx].quantity += qty;
+      final i = _cart.indexWhere((x) => x.product.barcode == p.barcode);
+      if (i >= 0) {
+        _cart[i].qty += q;
       } else {
-        _cart.add(CartItem(product: p, quantity: qty, customPrice: p.price));
+        _cart.add(CartItem(product: p, qty: q, price: p.price));
       }
     });
   }
 
-  void _promptNewItem(String barcode) async {
-    final online = await _fetchOnlineInfo(barcode);
-    if (!mounted) return;
-
-    final nameCtrl = TextEditingController(text: online['name']!.isNotEmpty ? online['name'] : '');
-    final priceCtrl = TextEditingController();
-
+  void _looseDialog(ProductItem item) {
+    final qCtrl = TextEditingController(text: '1.0');
     showDialog(
       context: context,
-      barrierDismissible: false,
-      builder: (ctx) => AlertDialog(
-        title: const Text('New Item Scanned', style: TextStyle(color: Colors.teal, fontWeight: FontWeight.bold)),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text('Barcode: $barcode', style: const TextStyle(color: Colors.grey)),
-            const SizedBox(height: 10),
-            TextField(
-              controller: nameCtrl,
-              decoration: const InputDecoration(labelText: 'Item Name*', border: OutlineInputBorder()),
-            ),
-            const SizedBox(height: 10),
-            TextField(
-              controller: priceCtrl,
-              keyboardType: const TextInputType.numberWithOptions(decimal: true),
-              autofocus: true,
-              decoration: const InputDecoration(labelText: 'Selling Price (₹)*', border: OutlineInputBorder()),
-            ),
-          ],
-        ),
+      builder: (c) => AlertDialog(
+        title: Text(item.name, style: const TextStyle(color: Colors.teal)),
+        content: TextField(controller: qCtrl, keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: 'Weight (Kg)')),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
           ElevatedButton(
             style: ElevatedButton.styleFrom(backgroundColor: Colors.teal, foregroundColor: Colors.white),
             onPressed: () {
-              final price = double.tryParse(priceCtrl.text) ?? 0.0;
-              final name = nameCtrl.text.trim().isNotEmpty ? nameCtrl.text.trim() : 'Item $barcode';
-              if (price > 0) {
-                final newItem = ProductItem(
-                  id: 'item_${DateTime.now().millisecondsSinceEpoch}',
-                  name: name,
-                  barcode: barcode,
-                  price: price,
-                  stock: 0,
-                  type: ItemType.piece,
-                  isPending: true,
-                  imageUrl: online['image'] ?? '',
-                );
-                widget.onQuickAdd(newItem);
-                _addToCart(newItem, 1.0);
-                Navigator.pop(ctx);
+              final w = double.tryParse(qCtrl.text) ?? 0;
+              if (w > 0) {
+                _addCart(item, w);
+                Navigator.pop(c);
               }
             },
             child: const Text('Add to Bill'),
-          ),
+          )
         ],
       ),
     );
   }
 
-  void _promptLooseQty(ProductItem item) {
-    final qtyCtrl = TextEditingController(text: '1.0');
-    showDialog(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: Text(item.name, style: const TextStyle(color: Colors.teal, fontWeight: FontWeight.bold)),
-        content: TextField(
-          controller: qtyCtrl,
-          keyboardType: const TextInputType.numberWithOptions(decimal: true),
-          decoration: const InputDecoration(labelText: 'Weight in Kg (e.g. 0.5, 1.5)', border: OutlineInputBorder()),
-        ),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
-          ElevatedButton(
-            style: ElevatedButton.styleFrom(backgroundColor: Colors.teal, foregroundColor: Colors.white),
-            onPressed: () {
-              final q = double.tryParse(qtyCtrl.text) ?? 0.0;
-              if (q > 0) {
-                _addToCart(item, q);
-                Navigator.pop(ctx);
-              }
-            },
-            child: const Text('Add to Bill'),
-          ),
-        ],
-      ),
-    );
-  }
-
-  void _checkout({required PaymentMethod method}) {
+  void _checkout(PaymentMethod m) {
     if (_cart.isEmpty) return;
-
-    if (method == PaymentMethod.udhaar) {
-      final phoneCtrl = TextEditingController();
-      final nameCtrl = TextEditingController();
+    if (m == PaymentMethod.udhaar) {
+      final pCtrl = TextEditingController();
+      final nCtrl = TextEditingController();
       showDialog(
         context: context,
-        builder: (ctx) => AlertDialog(
-          title: const Text('Customer Udhaar Khata', style: TextStyle(color: Colors.orange, fontWeight: FontWeight.bold)),
+        builder: (c) => AlertDialog(
+          title: const Text('Udhaar Khata', style: TextStyle(color: Colors.orange)),
           content: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              TextField(
-                controller: phoneCtrl,
-                keyboardType: TextInputType.phone,
-                autofocus: true,
-                decoration: const InputDecoration(labelText: 'Mobile Number*', border: OutlineInputBorder()),
-              ),
-              const SizedBox(height: 10),
-              TextField(
-                controller: nameCtrl,
-                decoration: const InputDecoration(labelText: 'Customer Name', border: OutlineInputBorder()),
-              ),
+              TextField(controller: pCtrl, keyboardType: TextInputType.phone, decoration: const InputDecoration(labelText: 'Customer Mobile*')),
+              TextField(controller: nCtrl, decoration: const InputDecoration(labelText: 'Name (Optional)')),
             ],
           ),
           actions: [
-            TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
             ElevatedButton(
               style: ElevatedButton.styleFrom(backgroundColor: Colors.orange.shade800, foregroundColor: Colors.white),
               onPressed: () {
-                if (phoneCtrl.text.trim().isEmpty) return;
-                final sale = SaleRecord(
-                  id: DateTime.now().millisecondsSinceEpoch.toString(),
-                  dateTime: DateTime.now(),
-                  items: List.from(_cart),
-                  totalAmount: _cartTotal,
-                  totalProfit: _cart.fold(0.0, (s, i) => s + i.profit),
-                  paymentMethod: PaymentMethod.udhaar,
-                  customerPhone: phoneCtrl.text.trim(),
-                  customerName: nameCtrl.text.trim().isEmpty ? 'Customer' : nameCtrl.text.trim(),
-                  isPaid: false,
-                );
-                widget.onSaleCompleted(sale);
-                Navigator.pop(ctx);
-                _showBillSuccess(sale);
+                if (pCtrl.text.isNotEmpty) {
+                  final s = SaleRecord(
+                    id: '${DateTime.now().millisecondsSinceEpoch}',
+                    date: DateTime.now(),
+                    items: List.from(_cart),
+                    total: _total,
+                    profit: _cart.fold(0, (a, b) => a + b.profit),
+                    method: PaymentMethod.udhaar,
+                    phone: pCtrl.text,
+                    name: nCtrl.text,
+                    isPaid: false,
+                  );
+                  widget.onSale(s);
+                  setState(() => _cart.clear());
+                  Navigator.pop(c);
+                }
               },
               child: const Text('Save Udhaar'),
-            ),
+            )
           ],
         ),
       );
     } else {
-      final sale = SaleRecord(
-        id: DateTime.now().millisecondsSinceEpoch.toString(),
-        dateTime: DateTime.now(),
+      final s = SaleRecord(
+        id: '${DateTime.now().millisecondsSinceEpoch}',
+        date: DateTime.now(),
         items: List.from(_cart),
-        totalAmount: _cartTotal,
-        totalProfit: _cart.fold(0.0, (s, i) => s + i.profit),
-        paymentMethod: PaymentMethod.cash,
-        isPaid: true,
+        total: _total,
+        profit: _cart.fold(0, (a, b) => a + b.profit),
+        method: PaymentMethod.cash,
       );
-      widget.onSaleCompleted(sale);
-      _showBillSuccess(sale);
+      widget.onSale(s);
+      setState(() => _cart.clear());
     }
-  }
-
-  void _showBillSuccess(SaleRecord sale) {
-    setState(() => _cart.clear());
-    showDialog(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Bill Generated! 🎉', style: TextStyle(color: Colors.teal, fontWeight: FontWeight.bold)),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text('Total Amount: ₹${sale.totalAmount.toStringAsFixed(2)}', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
-            const SizedBox(height: 6),
-            Text('Profit Earned: ₹${sale.totalProfit.toStringAsFixed(2)}', style: const TextStyle(color: Colors.green, fontWeight: FontWeight.bold)),
-            const SizedBox(height: 6),
-            Text('Payment: ${sale.paymentMethod == PaymentMethod.udhaar ? "Udhaar (${sale.customerPhone})" : "Cash"}'),
-          ],
-        ),
-        actions: [
-          ElevatedButton(
-            style: ElevatedButton.styleFrom(backgroundColor: Colors.teal, foregroundColor: Colors.white),
-            onPressed: () => Navigator.pop(ctx),
-            child: const Text('Next Bill'),
-          ),
-        ],
-      ),
-    );
   }
 
   @override
   Widget build(BuildContext context) {
-    final looseItems = widget.inventory.where((p) => p.type == ItemType.loose).toList();
-
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Vanik POS', style: TextStyle(fontWeight: FontWeight.bold)),
-        actions: [
-          IconButton(
-            icon: Icon(_scannerActive ? Icons.videocam_off : Icons.camera_alt),
-            onPressed: () => setState(() => _scannerActive = !_scannerActive),
-          ),
-          if (_cart.isNotEmpty)
-            IconButton(
-              icon: const Icon(Icons.delete_sweep),
-              onPressed: () => setState(() => _cart.clear()),
-            ),
-        ],
-      ),
+      appBar: AppBar(title: const Text('Vanik POS'), backgroundColor: Colors.teal, foregroundColor: Colors.white),
       body: Column(
         children: [
-          if (_scannerActive)
+          if (_cam)
             SizedBox(
               height: 200,
-              child: MobileScanner(onDetect: _onDetect),
+              child: MobileScanner(onDetect: (c) {
+                if (DateTime.now().difference(_last).inMilliseconds < 1500) return;
+                _last = DateTime.now();
+                for (final b in c.barcodes) {
+                  if (b.rawValue != null) {
+                    _checkBarcode(b.rawValue!);
+                    break;
+                  }
+                }
+              }),
             ),
           Padding(
-            padding: const EdgeInsets.all(10),
+            padding: const EdgeInsets.all(8),
             child: Row(
               children: [
                 Expanded(
                   child: ElevatedButton.icon(
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.teal,
-                      foregroundColor: Colors.white,
-                      padding: const EdgeInsets.symmetric(vertical: 12),
-                    ),
-                    onPressed: () => setState(() => _scannerActive = !_scannerActive),
-                    icon: Icon(_scannerActive ? Icons.stop : Icons.qr_code_scanner),
-                    label: Text(_scannerActive ? 'Stop Scanner' : 'Make Bill / Scan'),
+                    style: ElevatedButton.styleFrom(backgroundColor: Colors.teal, foregroundColor: Colors.white),
+                    onPressed: () => setState(() => _cam = !_cam),
+                    icon: Icon(_cam ? Icons.stop : Icons.qr_code_scanner),
+                    label: Text(_cam ? 'Stop Scan' : 'Scan Barcode'),
                   ),
                 ),
                 const SizedBox(width: 8),
                 ElevatedButton.icon(
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.orange.shade800,
-                    foregroundColor: Colors.white,
-                    padding: const EdgeInsets.symmetric(vertical: 12),
-                  ),
+                  style: ElevatedButton.styleFrom(backgroundColor: Colors.orange.shade800, foregroundColor: Colors.white),
                   onPressed: () {
+                    final loose = widget.items.where((x) => x.type == ItemType.loose).toList();
                     showModalBottomSheet(
                       context: context,
-                      builder: (ctx) => ListView(
-                        children: looseItems.map((item) => ListTile(
-                          leading: const Icon(Icons.scale, color: Colors.teal),
-                          title: Text(item.name, style: const TextStyle(fontWeight: FontWeight.bold)),
-                          subtitle: Text('Rate: ₹${item.price}/kg'),
+                      builder: (c) => ListView(
+                        children: loose.map((i) => ListTile(
+                          title: Text(i.name),
+                          subtitle: Text('₹${i.price}/kg'),
                           onTap: () {
-                            Navigator.pop(ctx);
-                            _promptLooseQty(item);
+                            Navigator.pop(c);
+                            _looseDialog(i);
                           },
                         )).toList(),
                       ),
                     );
                   },
                   icon: const Icon(Icons.scale),
-                  label: const Text('Loose Items'),
+                  label: const Text('Loose'),
                 ),
               ],
             ),
           ),
           Expanded(
             child: _cart.isEmpty
-                ? const Center(child: Text('No items in bill yet\nTap "Make Bill / Scan" to scan items', textAlign: TextAlign.center))
+                ? const Center(child: Text('Cart is empty. Scan items!'))
                 : ListView.builder(
                     itemCount: _cart.length,
-                    itemBuilder: (ctx, i) {
-                      final c = _cart[i];
-                      return ListTile(
-                        leading: c.product.imageUrl.isNotEmpty
-                            ? Image.network(c.product.imageUrl, width: 40, height: 40, fit: BoxFit.cover, errorBuilder: (_, __, ___) => const Icon(Icons.fastfood))
-                            : const Icon(Icons.inventory_2, color: Colors.teal),
-                        title: Text(c.product.name, style: const TextStyle(fontWeight: FontWeight.bold)),
-                        subtitle: Text('₹${c.customPrice} x ${c.quantity} ${c.product.type == ItemType.loose ? "kg" : "pcs"}'),
-                        trailing: Text('₹${c.total.toStringAsFixed(2)}', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-                      );
-                    },
+                    itemBuilder: (c, i) => ListTile(
+                      title: Text(_cart[i].product.name),
+                      subtitle: Text('₹${_cart[i].price} x ${_cart[i].qty}'),
+                      trailing: Text('₹${_cart[i].total.toStringAsFixed(2)}', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                    ),
                   ),
           ),
           Container(
@@ -656,97 +461,81 @@ class _BillingTabViewState extends State<BillingTabView> {
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    const Text('Total Bill Amount', style: TextStyle(fontSize: 16, color: Colors.grey)),
-                    Text('₹${_cartTotal.toStringAsFixed(2)}', style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: Colors.teal)),
+                    const Text('Total:', style: TextStyle(fontSize: 18)),
+                    Text('₹${_total.toStringAsFixed(2)}', style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: Colors.teal)),
                   ],
                 ),
-                const SizedBox(height: 8),
+                const SizedBox(height: 6),
                 Row(
                   children: [
                     Expanded(
-                      flex: 6,
                       child: ElevatedButton(
-                        style: ElevatedButton.styleFrom(backgroundColor: Colors.teal, foregroundColor: Colors.white, padding: const EdgeInsets.symmetric(vertical: 12)),
-                        onPressed: () => _checkout(method: PaymentMethod.cash),
-                        child: const Text('Update (Cash)', style: TextStyle(fontWeight: FontWeight.bold)),
+                        style: ElevatedButton.styleFrom(backgroundColor: Colors.teal, foregroundColor: Colors.white),
+                        onPressed: () => _checkout(PaymentMethod.cash),
+                        child: const Text('Cash'),
                       ),
                     ),
                     const SizedBox(width: 8),
                     Expanded(
-                      flex: 4,
                       child: ElevatedButton(
-                        style: ElevatedButton.styleFrom(backgroundColor: Colors.orange.shade800, foregroundColor: Colors.white, padding: const EdgeInsets.symmetric(vertical: 12)),
-                        onPressed: () => _checkout(method: PaymentMethod.udhaar),
-                        child: const Text('Udhaar', style: TextStyle(fontWeight: FontWeight.bold)),
+                        style: ElevatedButton.styleFrom(backgroundColor: Colors.orange.shade800, foregroundColor: Colors.white),
+                        onPressed: () => _checkout(PaymentMethod.udhaar),
+                        child: const Text('Udhaar'),
                       ),
                     ),
                   ],
-                ),
+                )
               ],
             ),
-          ),
+          )
         ],
       ),
     );
   }
 }
 
-class ShopTabView extends StatefulWidget {
-  final List<ProductItem> inventory;
-  final Function(ProductItem) onSaveProduct;
+class _ShopView extends StatelessWidget {
+  final List<ProductItem> items;
+  final Function(ProductItem) onSave;
+  const _ShopView({required this.items, required this.onSave});
 
-  const ShopTabView({super.key, required this.inventory, required this.onSaveProduct});
-
-  @override
-  State<ShopTabView> createState() => _ShopTabViewState();
-}
-
-class _ShopTabViewState extends State<ShopTabView> {
-  String _query = '';
-
-  void _openEditDialog(ProductItem item) {
-    final nameCtrl = TextEditingController(text: item.name);
-    final sellCtrl = TextEditingController(text: item.price.toString());
-    final costCtrl = TextEditingController(text: item.costPrice > 0 ? item.costPrice.toString() : '');
-    final stockCtrl = TextEditingController(text: item.stock.toString());
-    final imgCtrl = TextEditingController(text: item.imageUrl);
-
+  void _edit(BuildContext ctx, ProductItem item) {
+    final nC = TextEditingController(text: item.name);
+    final pC = TextEditingController(text: '${item.price}');
+    final cC = TextEditingController(text: '${item.costPrice}');
+    final sC = TextEditingController(text: '${item.stock}');
+    final iC = TextEditingController(text: item.imageUrl);
     showDialog(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Edit Product Details', style: TextStyle(color: Colors.teal, fontWeight: FontWeight.bold)),
+      context: ctx,
+      builder: (c) => AlertDialog(
+        title: const Text('Edit Product', style: TextStyle(color: Colors.teal)),
         content: SingleChildScrollView(
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              TextField(controller: nameCtrl, decoration: const InputDecoration(labelText: 'Product Name*', border: OutlineInputBorder())),
-              const SizedBox(height: 8),
-              TextField(controller: sellCtrl, keyboardType: const TextInputType.numberWithOptions(decimal: true), decoration: const InputDecoration(labelText: 'Selling Price (₹)*', border: OutlineInputBorder())),
-              const SizedBox(height: 8),
-              TextField(controller: costCtrl, keyboardType: const TextInputType.numberWithOptions(decimal: true), decoration: const InputDecoration(labelText: 'Cost / Khareed Rate (₹)', border: OutlineInputBorder())),
-              const SizedBox(height: 8),
-              TextField(controller: stockCtrl, keyboardType: const TextInputType.numberWithOptions(decimal: true), decoration: InputDecoration(labelText: 'Stock (${item.type == ItemType.loose ? "Kg" : "Pcs"})', border: const OutlineInputBorder())),
-              const SizedBox(height: 8),
-              TextField(controller: imgCtrl, decoration: const InputDecoration(labelText: 'Photo Link / Image URL', border: OutlineInputBorder())),
+              TextField(controller: nC, decoration: const InputDecoration(labelText: 'Name')),
+              TextField(controller: pC, keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: 'Selling Price (₹)')),
+              TextField(controller: cC, keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: 'Cost Price (₹)')),
+              TextField(controller: sC, keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: 'Stock')),
+              TextField(controller: iC, decoration: const InputDecoration(labelText: 'Image URL')),
             ],
           ),
         ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
           ElevatedButton(
             style: ElevatedButton.styleFrom(backgroundColor: Colors.teal, foregroundColor: Colors.white),
             onPressed: () {
-              if (nameCtrl.text.trim().isNotEmpty) item.name = nameCtrl.text.trim();
-              item.price = double.tryParse(sellCtrl.text) ?? item.price;
-              item.costPrice = double.tryParse(costCtrl.text) ?? item.costPrice;
-              item.stock = double.tryParse(stockCtrl.text) ?? item.stock;
-              item.imageUrl = imgCtrl.text.trim();
+              item.name = nC.text.trim();
+              item.price = double.tryParse(pC.text) ?? item.price;
+              item.costPrice = double.tryParse(cC.text) ?? item.costPrice;
+              item.stock = double.tryParse(sC.text) ?? item.stock;
+              item.imageUrl = iC.text.trim();
               item.isPending = false;
-              widget.onSaveProduct(item);
-              Navigator.pop(ctx);
+              onSave(item);
+              Navigator.pop(c);
             },
             child: const Text('Save'),
-          ),
+          )
         ],
       ),
     );
@@ -754,62 +543,35 @@ class _ShopTabViewState extends State<ShopTabView> {
 
   @override
   Widget build(BuildContext context) {
-    final filtered = widget.inventory.where((p) => p.name.toLowerCase().contains(_query.toLowerCase()) || p.barcode.contains(_query)).toList();
-
     return Scaffold(
-      appBar: AppBar(title: const Text('Shop & Stock', style: TextStyle(fontWeight: FontWeight.bold))),
-      body: Column(
-        children: [
-          Padding(
-            padding: const EdgeInsets.all(10),
-            child: TextField(
-              onChanged: (v) => setState(() => _query = v),
-              decoration: const InputDecoration(
-                hintText: 'Search items by name or barcode...',
-                prefixIcon: Icon(Icons.search),
-                border: OutlineInputBorder(),
-              ),
-            ),
-          ),
-          Expanded(
-            child: ListView.separated(
-              itemCount: filtered.length,
-              separatorBuilder: (_, __) => const Divider(height: 1),
-              itemBuilder: (ctx, i) {
-                final item = filtered[i];
-                return ListTile(
-                  leading: item.imageUrl.isNotEmpty
-                      ? ClipRRect(borderRadius: BorderRadius.circular(6), child: Image.network(item.imageUrl, width: 44, height: 44, fit: BoxFit.cover, errorBuilder: (_, __, ___) => const Icon(Icons.fastfood, color: Colors.teal)))
-                      : CircleAvatar(backgroundColor: Colors.teal.shade50, child: Icon(item.type == ItemType.loose ? Icons.scale : Icons.inventory_2, color: Colors.teal)),
-                  title: Text(item.name, style: const TextStyle(fontWeight: FontWeight.bold)),
-                  subtitle: Text('Sell: ₹${item.price} | Cost: ₹${item.costPrice} | Stock: ${item.stock} ${item.type == ItemType.loose ? "kg" : "pcs"}'),
-                  trailing: IconButton(
-                    icon: const Icon(Icons.edit, color: Colors.teal),
-                    onPressed: () => _edit(context, item),
-                  ),
-                );
-              },
-            ),
-          ),
-        ],
+      appBar: AppBar(title: const Text('Shop & Stock'), backgroundColor: Colors.teal, foregroundColor: Colors.white),
+      body: ListView.separated(
+        itemCount: items.length,
+        separatorBuilder: (_, __) => const Divider(height: 1),
+        itemBuilder: (ctx, i) => ListTile(
+          leading: items[i].imageUrl.isNotEmpty
+              ? Image.network(items[i].imageUrl, width: 40, height: 40, fit: BoxFit.cover, errorBuilder: (_, __, ___) => const Icon(Icons.fastfood))
+              : const Icon(Icons.inventory_2, color: Colors.teal),
+          title: Text(items[i].name, style: const TextStyle(fontWeight: FontWeight.bold)),
+          subtitle: Text('Sell: ₹${items[i].price} | Cost: ₹${items[i].costPrice} | Stock: ${items[i].stock}'),
+          trailing: IconButton(icon: const Icon(Icons.edit, color: Colors.teal), onPressed: () => _edit(context, items[i])),
+        ),
       ),
     );
   }
 }
 
-class SalesLedgerTabView extends StatelessWidget {
+class _SalesView extends StatelessWidget {
   final List<SaleRecord> sales;
-  final Function(String, bool) onTogglePaid;
-
-  const SalesLedgerTabView({super.key, required this.sales, required this.onTogglePaid});
+  final Function(String, bool) onStatus;
+  const _SalesView({required this.sales, required this.onStatus});
 
   @override
   Widget build(BuildContext context) {
-    final totalSales = sales.fold(0.0, (s, r) => s + r.totalAmount);
-    final totalProfit = sales.fold(0.0, (s, r) => s + r.totalProfit);
-
+    final tSale = sales.fold(0.0, (a, b) => a + b.total);
+    final tProf = sales.fold(0.0, (a, b) => a + b.profit);
     return Scaffold(
-      appBar: AppBar(title: const Text('My Sales & Profit', style: TextStyle(fontWeight: FontWeight.bold))),
+      appBar: AppBar(title: const Text('Sales Ledger'), backgroundColor: Colors.teal, foregroundColor: Colors.white),
       body: Column(
         children: [
           Container(
@@ -819,88 +581,54 @@ class SalesLedgerTabView extends StatelessWidget {
               mainAxisAlignment: MainAxisAlignment.spaceAround,
               children: [
                 Column(children: [
-                  const Text('Total Daily Sales', style: TextStyle(color: Colors.grey)),
-                  Text('₹${totalSales.toStringAsFixed(2)}', style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: Colors.teal)),
+                  const Text('Total Sale', style: TextStyle(color: Colors.grey)),
+                  Text('₹${tSale.toStringAsFixed(2)}', style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Colors.teal)),
                 ]),
                 Column(children: [
                   const Text('Total Profit', style: TextStyle(color: Colors.grey)),
-                  Text('₹${totalProfit.toStringAsFixed(2)}', style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: Colors.green)),
+                  Text('₹${tProf.toStringAsFixed(2)}', style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Colors.green)),
                 ]),
               ],
             ),
           ),
-          const Divider(height: 1),
           Expanded(
-            child: sales.isEmpty
-                ? const Center(child: Text('No sales recorded yet'))
-                : ListView.builder(
-                    itemCount: sales.length,
-                    itemBuilder: (ctx, i) {
-                      final s = sales[i];
-                      return ListTile(
-                        leading: CircleAvatar(
-                          backgroundColor: s.paymentMethod == PaymentMethod.udhaar ? Colors.orange.shade100 : Colors.teal.shade100,
-                          child: Icon(s.paymentMethod == PaymentMethod.udhaar ? Icons.book : Icons.check, color: s.paymentMethod == PaymentMethod.udhaar ? Colors.orange : Colors.teal),
-                        ),
-                        title: Text('₹${s.totalAmount.toStringAsFixed(2)}  (Profit: +₹${s.totalProfit.toStringAsFixed(2)})', style: const TextStyle(fontWeight: FontWeight.bold)),
-                        subtitle: Text('${DateFormat('hh:mm a, dd MMM').format(s.dateTime)} | ${s.paymentMethod == PaymentMethod.udhaar ? "Udhaar: ${s.customerPhone}" : "Cash"}'),
-                        trailing: s.paymentMethod == PaymentMethod.udhaar
-                            ? TextButton(
-                                onPressed: () => onTogglePaid(s.id, !s.isPaid),
-                                child: Text(s.isPaid ? 'PAID' : 'PENDING', style: TextStyle(color: s.isPaid ? Colors.green : Colors.red, fontWeight: FontWeight.bold)),
-                              )
-                            : const Text('PAID', style: TextStyle(color: Colors.green, fontWeight: FontWeight.bold)),
-                      );
-                    },
-                  ),
-          ),
+            child: ListView.builder(
+              itemCount: sales.length,
+              itemBuilder: (ctx, i) => ListTile(
+                title: Text('₹${sales[i].total.toStringAsFixed(2)} (Profit: +₹${sales[i].profit.toStringAsFixed(2)})'),
+                subtitle: Text('${DateFormat('hh:mm a, dd MMM').format(sales[i].date)} | ${sales[i].method == PaymentMethod.udhaar ? "Udhaar: ${sales[i].phone}" : "Cash"}'),
+                trailing: sales[i].method == PaymentMethod.udhaar
+                    ? TextButton(
+                        onPressed: () => onStatus(sales[i].id, !sales[i].isPaid),
+                        child: Text(sales[i].isPaid ? 'PAID' : 'PENDING', style: TextStyle(color: sales[i].isPaid ? Colors.green : Colors.red, fontWeight: FontWeight.bold)),
+                      )
+                    : const Text('PAID', style: TextStyle(color: Colors.green, fontWeight: FontWeight.bold)),
+              ),
+            ),
+          )
         ],
       ),
     );
   }
 }
 
-class ProfileTabView extends StatelessWidget {
-  final String shopCode;
-
-  const ProfileTabView({super.key, required this.shopCode});
-
+class _SyncView extends StatelessWidget {
+  final String code;
+  const _SyncView({required this.code});
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Profile & Shop Sync', style: TextStyle(fontWeight: FontWeight.bold))),
-      body: Padding(
-        padding: const EdgeInsets.all(16),
+      appBar: AppBar(title: const Text('Dukan Sync Code'), backgroundColor: Colors.teal, foregroundColor: Colors.white),
+      body: Center(
         child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Card(
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-              child: ListTile(
-                leading: const CircleAvatar(backgroundColor: Colors.teal, child: Icon(Icons.store, color: Colors.white)),
-                title: const Text('Dukan Setup & Join Code', style: TextStyle(fontWeight: FontWeight.bold)),
-                subtitle: Text('Multi-staff connection code: $shopCode'),
-              ),
-            ),
-            const SizedBox(height: 16),
-            const Text('Multi-User Phone Sync:', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-            const SizedBox(height: 8),
-            const Text(
-              'Dusre phone ya staff ke phone me "Join a Shop" select karke ye code daalne par dukan ka stock aapas me link ho jayega.',
-              style: TextStyle(color: Colors.black87),
-            ),
-            const SizedBox(height: 20),
-            ElevatedButton.icon(
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.teal,
-                foregroundColor: Colors.white,
-                minimumSize: const Size(double.infinity, 45),
-              ),
-              onPressed: () {
-                ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Shop sync code copied!')));
-              },
-              icon: const Icon(Icons.copy),
-              label: const Text('Copy Shop Code'),
+            const Icon(Icons.qr_code, size: 80, color: Colors.teal),
+            const SizedBox(height: 12),
+            Text('Shop Code: $code', style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
+            const Padding(
+              padding: EdgeInsets.all(16),
+              child: Text('Dusre phone me sync karne ke liye yeh code use karein.', textAlign: TextAlign.center),
             ),
           ],
         ),
