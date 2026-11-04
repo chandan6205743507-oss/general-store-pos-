@@ -14,120 +14,126 @@ class ReceiptViewDialog extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final dateFormat = DateFormat('dd MMM yyyy, hh:mm a');
+    final currencyFormat = NumberFormat.currency(symbol: '₹', decimalDigits: 2);
+    final isUdhaar = sale.paymentMethod == PaymentMethod.udhaar;
 
     return Dialog(
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-      child: Container(
-        padding: const EdgeInsets.all(16),
-        constraints: const BoxConstraints(maxWidth: 400),
-        child: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Center(
-                child: Column(
-                  children: [
-                    const Icon(Icons.check_circle, color: Colors.teal, size: 50),
-                    const SizedBox(height: 8),
-                    const Text(
-                      'GENERAL STORE',
-                      style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
-                    ),
-                    const Text('Cash / Digital Receipt', style: TextStyle(color: Colors.grey)),
-                    const SizedBox(height: 4),
-                    Text(
-                      dateFormat.format(sale.dateTime),
-                      style: const TextStyle(fontSize: 12, color: Colors.grey),
-                    ),
-                  ],
-                ),
+      child: Padding(
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const CircleAvatar(
+              radius: 28,
+              backgroundColor: Color(0xFFE0F2F1),
+              child: Icon(Icons.check, size: 36, color: Colors.teal),
+            ),
+            const SizedBox(height: 12),
+            const Text(
+              'Bill Saved Successfully',
+              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.teal),
+            ),
+            Text(
+              DateFormat('dd MMM yyyy, hh:mm a').format(sale.dateTime),
+              style: const TextStyle(fontSize: 12, color: Colors.grey),
+            ),
+            const Divider(height: 24),
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: Colors.grey.shade50,
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: Colors.grey.shade200),
               ),
-              const Divider(thickness: 1.5, height: 24),
-              if (sale.customer != null) ...[
-                Text('Customer: ${sale.customer!.name}', style: const TextStyle(fontWeight: FontWeight.bold)),
-                if (sale.customer!.phone.isNotEmpty)
-                  Text('Phone: ${sale.customer!.phone}', style: const TextStyle(color: Colors.grey)),
-                const SizedBox(height: 8),
-              ],
-              const Text('Items Purchased:', style: TextStyle(fontWeight: FontWeight.bold)),
-              const SizedBox(height: 6),
-              ...sale.items.map(
-                (item) => Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 2.0),
-                  child: Row(
+              child: Column(
+                children: [
+                  Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      Expanded(
-                        child: Text(
-                          '${item.product.name} (x${item.product.type == ItemType.loose ? item.quantity.toStringAsFixed(2) : item.quantity.toInt()})',
-                          style: const TextStyle(fontSize: 13),
+                      const Text('Payment Mode:'),
+                      Text(
+                        isUdhaar ? 'Udhaar Khata' : 'Cash',
+                        style: TextStyle(
+                          fontWeight: FontWeight.bold,
+                          color: isUdhaar ? Colors.orange.shade900 : Colors.teal,
                         ),
                       ),
-                      Text('₹${item.total.toStringAsFixed(2)}', style: const TextStyle(fontWeight: FontWeight.w600)),
                     ],
                   ),
-                ),
-              ),
-              const Divider(height: 20),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  const Text('Total Amount:', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-                  Text(
-                    '₹${sale.totalAmount.toStringAsFixed(2)}',
-                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18, color: Colors.teal),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 6),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  const Text('Payment Mode:'),
-                  Text(
-                    sale.paymentMethod.name.toUpperCase(),
-                    style: TextStyle(
-                      fontWeight: FontWeight.bold,
-                      color: sale.paymentMethod == PaymentMethod.udhaar ? Colors.red : Colors.green,
+                  if (sale.customer != null) ...[
+                    const SizedBox(height: 6),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        const Text('Customer:'),
+                        Text(
+                          '${sale.customer!.name} (${sale.customer!.phone})',
+                          style: const TextStyle(fontWeight: FontWeight.w500),
+                        ),
+                      ],
                     ),
+                  ],
+                  const SizedBox(height: 6),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      const Text('Total Items:'),
+                      Text('${sale.items.length}', style: const TextStyle(fontWeight: FontWeight.bold)),
+                    ],
+                  ),
+                  const Divider(height: 16),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      const Text('Bill Amount:', style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold)),
+                      Text(
+                        currencyFormat.format(sale.totalAmount),
+                        style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.teal),
+                      ),
+                    ],
                   ),
                 ],
               ),
-              if (sale.paymentMethod == PaymentMethod.cash) ...[
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    const Text('Cash Received:'),
-                    Text('₹${sale.cashReceived.toStringAsFixed(2)}'),
-                  ],
+            ),
+            const SizedBox(height: 20),
+            Row(
+              children: [
+                Expanded(
+                  child: OutlinedButton.icon(
+                    style: OutlinedButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                      side: const BorderSide(color: Colors.green),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                    ),
+                    onPressed: () {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text('Bill text ready to share.')),
+                      );
+                    },
+                    icon: const Icon(Icons.share, color: Colors.green),
+                    label: const Text('Share Bill', style: TextStyle(color: Colors.green)),
+                  ),
                 ),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    const Text('Change Returned:'),
-                    Text('₹${sale.changeReturned.toStringAsFixed(2)}'),
-                  ],
+                const SizedBox(width: 8),
+                Expanded(
+                  child: ElevatedButton(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.teal,
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                    ),
+                    onPressed: () {
+                      Navigator.pop(context);
+                      onNewBill();
+                    },
+                    child: const Text('New Bill'),
+                  ),
                 ),
               ],
-              const SizedBox(height: 20),
-              ElevatedButton.icon(
-                onPressed: () {
-                  Navigator.of(context).pop();
-                  onNewBill();
-                },
-                icon: const Icon(Icons.add),
-                label: const Text('Start New Bill'),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.teal,
-                  foregroundColor: Colors.white,
-                  padding: const EdgeInsets.symmetric(vertical: 12),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                ),
-              ),
-            ],
-          ),
+            ),
+          ],
         ),
       ),
     );
