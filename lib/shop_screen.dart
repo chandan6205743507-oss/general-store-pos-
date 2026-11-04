@@ -1,5 +1,7 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
+import 'package:http/http.dart' as http;
 import 'models.dart';
 
 class ShopScreen extends StatefulWidget {
@@ -35,12 +37,41 @@ class _ShopScreenState extends State<ShopScreen> {
         .toList();
   }
 
-  void _showAddBarcodeItemDialog({String scannedCode = ''}) {
-    final nameCtrl = TextEditingController();
+  Future> _lookupBarcodeOnline(String barcode) async {
+    try {
+      final uri = Uri.parse('https://world.openfoodfacts.org/api/v0/product/$barcode.json');
+      final res = await http.get(uri).timeout(const Duration(seconds: 4));
+      if (res.statusCode == 200) {
+        final data = jsonDecode(res.body);
+        if (data['status'] == 1 && data['product'] != null) {
+          final p = data['product'];
+          return {
+            'name': p['product_name'] ?? '',
+            'image': p['image_front_small_url'] ?? p['image_url'] ?? '',
+          };
+        }
+      }
+    } catch (_) {}
+    return {'name': '', 'image': ''};
+  }
+
+  void _showAddBarcodeItemDialog({String scannedCode = ''}) async {
+    String autoName = '';
+    String autoImage = '';
+    if (scannedCode.isNotEmpty) {
+      final fetched = await _lookupBarcodeOnline(scannedCode);
+      autoName = fetched['name'] ?? '';
+      autoImage = fetched['image'] ?? '';
+    }
+
+    if (!mounted) return;
+
+    final nameCtrl = TextEditingController(text: autoName);
     final barcodeCtrl = TextEditingController(text: scannedCode);
     final totalCostCtrl = TextEditingController();
     final totalQtyCtrl = TextEditingController();
     final sellPriceCtrl = TextEditingController();
+    final imageCtrl = TextEditingController(text: autoImage);
 
     showDialog(
       context: context,
@@ -54,7 +85,7 @@ class _ShopScreenState extends State<ShopScreen> {
             children: [
               TextField(
                 controller: nameCtrl,
-                decoration: const InputDecoration(labelText: 'Item Name (e.g. Good Day)*', border: OutlineInputBorder()),
+                decoration: const InputDecoration(labelText: 'Item Name (e.g. Britannia 5050)*', border: OutlineInputBorder()),
               ),
               const SizedBox(height: 10),
               TextField(
@@ -65,7 +96,7 @@ class _ShopScreenState extends State<ShopScreen> {
               TextField(
                 controller: totalCostCtrl,
                 keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                decoration: const InputDecoration(labelText: 'Total Bill Amount to Distributor (₹)', border: OutlineInputBorder()),
+                decoration: const InputDecoration(labelText: 'Total Bill to Distributor (₹)', border: OutlineInputBorder()),
               ),
               const SizedBox(height: 10),
               TextField(
@@ -78,6 +109,11 @@ class _ShopScreenState extends State<ShopScreen> {
                 controller: sellPriceCtrl,
                 keyboardType: const TextInputType.numberWithOptions(decimal: true),
                 decoration: const InputDecoration(labelText: 'Selling Price per Piece (₹)*', border: OutlineInputBorder()),
+              ),
+              const SizedBox(height: 10),
+              TextField(
+                controller: imageCtrl,
+                decoration: const InputDecoration(labelText: 'Photo Link / URL (Optional)', border: OutlineInputBorder()),
               ),
             ],
           ),
@@ -104,6 +140,7 @@ class _ShopScreenState extends State<ShopScreen> {
                   stock: qty,
                   type: ItemType.piece,
                   isPending: false,
+                  imageUrl: imageCtrl.text.trim(),
                 ));
                 Navigator.pop(ctx);
               }
@@ -188,33 +225,54 @@ class _ShopScreenState extends State<ShopScreen> {
     );
   }
 
-  void _showResolvePendingDialog(ProductItem item) {
+  void _showEditProductDialog(ProductItem item) {
     final nameCtrl = TextEditingController(text: item.name);
-    final costCtrl = TextEditingController(text: item.costPrice > 0 ? item.costPrice.toString() : '');
-    final stockCtrl = TextEditingController(text: item.stock > 0 ? item.stock.toString() : '');
+    final sellPriceCtrl = TextEditingController(text: item.price.toString());
+    final costPriceCtrl = TextEditingController(text: item.costPrice > 0 ? item.costPrice.toString() : '');
+    final stockCtrl = TextEditingController(text: item.stock.toString());
+    final imageCtrl = TextEditingController(text: item.imageUrl);
 
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: const Text('Complete Product Details', style: TextStyle(color: Colors.teal, fontWeight: FontWeight.bold)),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            TextField(controller: nameCtrl, decoration: const InputDecoration(labelText: 'Product Name', border: OutlineInputBorder())),
-            const SizedBox(height: 10),
-            TextField(
-              controller: costCtrl,
-              keyboardType: const TextInputType.numberWithOptions(decimal: true),
-              decoration: const InputDecoration(labelText: 'Purchase / Cost Price (₹)', border: OutlineInputBorder()),
-            ),
-            const SizedBox(height: 10),
-            TextField(
-              controller: stockCtrl,
-              keyboardType: const TextInputType.numberWithOptions(decimal: true),
-              decoration: const InputDecoration(labelText: 'Total Stock Available (Pcs/Kg)', border: OutlineInputBorder()),
-            ),
-          ],
+        title: const Text('Edit Product Details', style: TextStyle(color: Colors.teal, fontWeight: FontWeight.bold)),
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextField(
+                controller: nameCtrl,
+                decoration: const InputDecoration(labelText: 'Item Name*', border: OutlineInputBorder()),
+              ),
+              const SizedBox(height: 10),
+              TextField(
+                controller: sellPriceCtrl,
+                keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                decoration: const InputDecoration(labelText: 'Selling Price (₹)*', border: OutlineInputBorder()),
+              ),
+              const SizedBox(height: 10),
+              TextField(
+                controller: costPriceCtrl,
+                keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                decoration: const InputDecoration(labelText: 'Cost / Khareed Price (₹)', border: OutlineInputBorder()),
+              ),
+              const SizedBox(height: 10),
+              TextField(
+                controller: stockCtrl,
+                keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                decoration: InputDecoration(
+                  labelText: 'Stock (${item.type == ItemType.loose ? "Kg" : "Pieces"})',
+                  border: const OutlineInputBorder(),
+                ),
+              ),
+              const SizedBox(height: 10),
+              TextField(
+                controller: imageCtrl,
+                decoration: const InputDecoration(labelText: 'Photo Link / URL', border: OutlineInputBorder()),
+              ),
+            ],
+          ),
         ),
         actions: [
           TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
@@ -222,14 +280,16 @@ class _ShopScreenState extends State<ShopScreen> {
             style: ElevatedButton.styleFrom(backgroundColor: Colors.teal, foregroundColor: Colors.white),
             onPressed: () {
               setState(() {
-                item.name = nameCtrl.text.trim().isEmpty ? item.name : nameCtrl.text.trim();
-                item.costPrice = double.tryParse(costCtrl.text) ?? 0.0;
-                item.stock = double.tryParse(stockCtrl.text) ?? 0.0;
+                if (nameCtrl.text.trim().isNotEmpty) item.name = nameCtrl.text.trim();
+                item.price = double.tryParse(sellPriceCtrl.text) ?? item.price;
+                item.costPrice = double.tryParse(costPriceCtrl.text) ?? item.costPrice;
+                item.stock = double.tryParse(stockCtrl.text) ?? item.stock;
+                item.imageUrl = imageCtrl.text.trim();
                 item.isPending = false;
               });
               Navigator.pop(ctx);
             },
-            child: const Text('Save to Stock'),
+            child: const Text('Save Changes'),
           ),
         ],
       ),
@@ -316,16 +376,20 @@ class _ShopScreenState extends State<ShopScreen> {
                     ],
                   ),
                   const SizedBox(height: 6),
-                  const Text('Complete cost & stock for items added during quick bill:', style: TextStyle(fontSize: 12, color: Colors.black87)),
+                  const Text('Name, cost aur stock complete karein:', style: TextStyle(fontSize: 12, color: Colors.black87)),
                   ..._pendingItems.map((item) => ListTile(
                         dense: true,
                         contentPadding: EdgeInsets.zero,
+                        leading: CircleAvatar(
+                          backgroundColor: Colors.red.shade100,
+                          child: const Icon(Icons.edit_note, color: Colors.red),
+                        ),
                         title: Text(item.name, style: const TextStyle(fontWeight: FontWeight.bold)),
-                        subtitle: Text('Sell Price: ₹${item.price} | Barcode: ${item.barcode}'),
+                        subtitle: Text('Sell: ₹${item.price} | Barcode: ${item.barcode}'),
                         trailing: ElevatedButton(
                           style: ElevatedButton.styleFrom(backgroundColor: Colors.teal, foregroundColor: Colors.white),
-                          onPressed: () => _showResolvePendingDialog(item),
-                          child: const Text('Complete'),
+                          onPressed: () => _showEditProductDialog(item),
+                          child: const Text('Complete / Edit'),
                         ),
                       )),
                 ],
@@ -352,49 +416,31 @@ class _ShopScreenState extends State<ShopScreen> {
                     itemBuilder: (ctx, i) {
                       final item = _filteredProducts[i];
                       return ListTile(
-                        leading: CircleAvatar(
-                          backgroundColor: item.type == ItemType.loose ? Colors.teal.shade100 : Colors.blue.shade100,
-                          child: Icon(item.type == ItemType.loose ? Icons.scale : Icons.inventory_2, color: Colors.teal),
-                        ),
+                        leading: item.imageUrl.isNotEmpty
+                            ? ClipRRect(
+                                borderRadius: BorderRadius.circular(8),
+                                child: Image.network(
+                                  item.imageUrl,
+                                  width: 44,
+                                  height: 44,
+                                  fit: BoxFit.cover,
+                                  errorBuilder: (_, __, ___) => CircleAvatar(
+                                    backgroundColor: item.type == ItemType.loose ? Colors.teal.shade100 : Colors.blue.shade100,
+                                    child: Icon(item.type == ItemType.loose ? Icons.scale : Icons.inventory_2, color: Colors.teal),
+                                  ),
+                                ),
+                              )
+                            : CircleAvatar(
+                                backgroundColor: item.type == ItemType.loose ? Colors.teal.shade100 : Colors.blue.shade100,
+                                child: Icon(item.type == ItemType.loose ? Icons.scale : Icons.inventory_2, color: Colors.teal),
+                              ),
                         title: Text(item.name, style: const TextStyle(fontWeight: FontWeight.bold)),
                         subtitle: Text(
                           'Sell: ₹${item.price} | Cost: ₹${item.costPrice.toStringAsFixed(1)} | Stock: ${item.stock} ${item.type == ItemType.loose ? 'kg' : 'pcs'}',
                         ),
                         trailing: IconButton(
                           icon: const Icon(Icons.edit, color: Colors.teal),
-                          onPressed: () {
-                            final editPriceCtrl = TextEditingController(text: item.price.toString());
-                            final editStockCtrl = TextEditingController(text: item.stock.toString());
-                            showDialog(
-                              context: context,
-                              builder: (c) => AlertDialog(
-                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                                title: Text('Edit ${item.name}'),
-                                content: Column(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    TextField(controller: editPriceCtrl, keyboardType: const TextInputType.numberWithOptions(decimal: true), decoration: const InputDecoration(labelText: 'Selling Price (₹)', border: OutlineInputBorder())),
-                                    const SizedBox(height: 10),
-                                    TextField(controller: editStockCtrl, keyboardType: const TextInputType.numberWithOptions(decimal: true), decoration: const InputDecoration(labelText: 'Stock (Qty/Kg)', border: OutlineInputBorder())),
-                                  ],
-                                ),
-                                actions: [
-                                  TextButton(onPressed: () => Navigator.pop(c), child: const Text('Cancel')),
-                                  ElevatedButton(
-                                    style: ElevatedButton.styleFrom(backgroundColor: Colors.teal, foregroundColor: Colors.white),
-                                    onPressed: () {
-                                      setState(() {
-                                        item.price = double.tryParse(editPriceCtrl.text) ?? item.price;
-                                        item.stock = double.tryParse(editStockCtrl.text) ?? item.stock;
-                                      });
-                                      Navigator.pop(c);
-                                    },
-                                    child: const Text('Update'),
-                                  ),
-                                ],
-                              ),
-                            );
-                          },
+                          onPressed: () => _showEditProductDialog(item),
                         ),
                       );
                     },
