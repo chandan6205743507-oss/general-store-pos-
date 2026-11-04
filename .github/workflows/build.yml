@@ -25,6 +25,9 @@ jobs:
           flutter-version: '3.24.0'
           channel: 'stable'
 
+      - name: Generate Android Scaffold
+        run: flutter create . --platforms=android --org com.generalstore.pos
+
       - name: Install dependencies
         run: flutter pub get
 
