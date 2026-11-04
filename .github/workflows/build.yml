@@ -26,7 +26,7 @@ jobs:
           channel: 'stable'
 
       - name: Generate Android Scaffold
-        run: flutter create . --platforms=android --org com.generalstore.pos
+        run: flutter create . --project-name general_store_pos --platforms=android --org com.generalstore.pos
 
       - name: Install dependencies
         run: flutter pub get
