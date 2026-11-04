@@ -22,25 +22,28 @@ jobs:
       - name: Setup Flutter
         uses: subosito/flutter-action@v2
         with:
-          flutter-version: '3.24.0'
+          flutter-version: '3.22.2'
           channel: 'stable'
 
-      - name: Generate Android Scaffold
-        run: flutter create . --project-name general_store_pos --platforms=android --org com.generalstore.pos
+      - name: Generate Android Project
+        run: |
+          flutter create . --project-name general_store_pos --platforms=android --org com.generalstore.pos
+          echo "android.useAndroidX=true" >> android/gradle.properties
+          echo "android.enableJetifier=true" >> android/gradle.properties
 
-      - name: Configure Android Kotlin, Camera & MinSDK
+      - name: Set Android Camera & MinSDK
         run: |
           sed -i 's/minSdkVersion = flutter.minSdkVersion/minSdkVersion = 21/' android/app/build.gradle || true
           sed -i 's/minSdk = flutter.minSdkVersion/minSdk = 21/' android/app/build.gradle || true
+          sed -i 's/minSdkVersion 16/minSdkVersion 21/' android/app/build.gradle || true
+          sed -i 's/minSdkVersion 19/minSdkVersion 21/' android/app/build.gradle || true
           sed -i 's/<application/<uses-permission android:name="android.permission.CAMERA"\/>\n    <application/' android/app/src/main/AndroidManifest.xml || true
-          sed -i 's/ext.kotlin_version = .*/ext.kotlin_version = "1.9.24"/' android/build.gradle || true
-          sed -i 's/kotlin("android") version "[^"]*"/kotlin("android") version "1.9.24"/' android/settings.gradle || true
 
       - name: Install dependencies
         run: flutter pub get
 
       - name: Build APK
-        run: flutter build apk --release
+        run: flutter build apk --release --no-tree-shake-icons
 
       - name: Upload APK Artifact
         uses: actions/upload-artifact@v4
