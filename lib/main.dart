@@ -2,141 +2,13 @@ import 'dart:convert';
 import 'dart:io';
 import 'dart:math';
 import 'package:flutter/material.dart';
-import 'package:intl/intl.dart';
+import 'package:flutter/services.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:url_launcher/url_launcher.dart';
-import 'package:image_picker/image_picker.dart';
 
-// ==========================================
-// 1. DATA MODELS & ENUMS
-// ==========================================
-enum ItemType { piece, loose }
-enum PaymentMethod { cash, online, udhaar }
-
-class ProductItem {
-  String id;
-  String name;
-  String barcode;
-  double sellingPrice;
-  double buyingPrice;
-  double stock;
-  ItemType type;
-  String imagePath;
-  bool isPending;
-
-  ProductItem({
-    required this.id,
-    required this.name,
-    required this.barcode,
-    required this.sellingPrice,
-    this.buyingPrice = 0.0,
-    required this.stock,
-    required this.type,
-    this.imagePath = '',
-    this.isPending = false,
-  });
-
-  Map<String, dynamic> toMap() => {
-    'id': id,
-    'name': name,
-    'barcode': barcode,
-    'sellingPrice': sellingPrice,
-    'buyingPrice': buyingPrice,
-    'stock': stock,
-    'type': type.index,
-    'imagePath': imagePath,
-    'isPending': isPending,
-  };
-
-  factory ProductItem.fromMap(Map<String, dynamic> map) => ProductItem(
-    id: map['id'] ?? '',
-    name: map['name'] ?? '',
-    barcode: map['barcode'] ?? '',
-    sellingPrice: (map['sellingPrice'] as num?)?.toDouble() ?? 0.0,
-    buyingPrice: (map['buyingPrice'] as num?)?.toDouble() ?? 0.0,
-    stock: (map['stock'] as num?)?.toDouble() ?? 0.0,
-    type: ItemType.values[map['type'] ?? 0],
-    imagePath: map['imagePath'] ?? '',
-    isPending: map['isPending'] ?? false,
-  );
-}
-
-class CartItem {
-  final ProductItem product;
-  double quantity;
-  double customPrice;
-
-  CartItem({
-    required this.product,
-    required this.quantity,
-    required this.customPrice,
-  });
-
-  double get total => quantity * customPrice;
-  double get profit => (customPrice - product.buyingPrice) * quantity;
-
-  Map<String, dynamic> toMap() => {
-    'product': product.toMap(),
-    'quantity': quantity,
-    'customPrice': customPrice,
-  };
-
-  factory CartItem.fromMap(Map<String, dynamic> map) => CartItem(
-    product: ProductItem.fromMap(map['product']),
-    quantity: (map['quantity'] as num?)?.toDouble() ?? 1.0,
-    customPrice: (map['customPrice'] as num?)?.toDouble() ?? 0.0,
-  );
-}
-
-class SaleRecord {
-  final String id;
-  final DateTime date;
-  final List<CartItem> items;
-  final double total;
-  final double profit;
-  final PaymentMethod method;
-  final String customerPhone;
-  bool isPaid;
-
-  SaleRecord({
-    required this.id,
-    required this.date,
-    required this.items,
-    required this.total,
-    required this.profit,
-    required this.method,
-    this.customerPhone = '',
-    this.isPaid = true,
-  });
-
-  Map<String, dynamic> toMap() => {
-    'id': id,
-    'date': date.toIso8601String(),
-    'items': items.map((i) => i.toMap()).toList(),
-    'total': total,
-    'profit': profit,
-    'method': method.index,
-    'customerPhone': customerPhone,
-    'isPaid': isPaid,
-  };
-
-  factory SaleRecord.fromMap(Map<String, dynamic> map) => SaleRecord(
-    id: map['id'] ?? '',
-    date: DateTime.tryParse(map['date'] ?? '') ?? DateTime.now(),
-    items: (map['items'] as List<dynamic>?)?.map((i) => CartItem.fromMap(i)).toList() ?? [],
-    total: (map['total'] as num?)?.toDouble() ?? 0.0,
-    profit: (map['profit'] as num?)?.toDouble() ?? 0.0,
-    method: PaymentMethod.values[map['method'] ?? 0],
-    customerPhone: map['customerPhone'] ?? '',
-    isPaid: map['isPaid'] ?? true,
-  );
-}
-
-// ==========================================
-// 2. MAIN APP ENTRY POINT
-// ==========================================
-void main() {
+void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   runApp(const VanikApp());
 }
@@ -147,7 +19,7 @@ class VanikApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'Vanik Kirana Store',
+      title: 'Vanik Dukandar',
       debugShowCheckedModeBanner: false,
       theme: ThemeData(
         scaffoldBackgroundColor: const Color(0xFFFBF8F2),
@@ -157,15 +29,123 @@ class VanikApp extends StatelessWidget {
           primary: const Color(0xFF2D5A27),
           secondary: const Color(0xFFD9822B),
         ),
-        useMaterial3: true,
+        fontFamily: 'sans-serif',
       ),
       home: const MainNavigationScreen(),
     );
   }
 }
-// ==========================================
-// 3. PERSISTENT NAVIGATION & TOP PROFILE
-// ==========================================
+
+// ----------------- DATA MODELS -----------------
+
+class ProductItem {
+  String barcode;
+  String name;
+  double sellingPrice;
+  double purchasePrice;
+  double stock;
+  String? imagePath;
+  bool isLoose;
+  bool isPending;
+
+  ProductItem({
+    required this.barcode,
+    required this.name,
+    required this.sellingPrice,
+    this.purchasePrice = 0.0,
+    required this.stock,
+    this.imagePath,
+    this.isLoose = false,
+    this.isPending = false,
+  });
+
+  Map<String, dynamic> toJson() => {
+        'barcode': barcode,
+        'name': name,
+        'sellingPrice': sellingPrice,
+        'purchasePrice': purchasePrice,
+        'stock': stock,
+        'imagePath': imagePath,
+        'isLoose': isLoose,
+        'isPending': isPending,
+      };
+
+  factory ProductItem.fromJson(Map<String, dynamic> json) => ProductItem(
+        barcode: json['barcode'] ?? '',
+        name: json['name'] ?? '',
+        sellingPrice: (json['sellingPrice'] as num?)?.toDouble() ?? 0.0,
+        purchasePrice: (json['purchasePrice'] as num?)?.toDouble() ?? 0.0,
+        stock: (json['stock'] as num?)?.toDouble() ?? 0.0,
+        imagePath: json['imagePath'],
+        isLoose: json['isLoose'] ?? false,
+        isPending: json['isPending'] ?? false,
+      );
+}
+
+class CartItem {
+  ProductItem product;
+  double quantity;
+  double unitPrice;
+
+  CartItem({
+    required this.product,
+    required this.quantity,
+    required this.unitPrice,
+  });
+
+  double get total => quantity * unitPrice;
+}
+
+class SaleRecord {
+  String id;
+  String date; // YYYY-MM-DD
+  String time; // HH:mm
+  double totalAmount;
+  String paymentMode; // 'Cash', 'Online', 'Udhaar'
+  String? customerName;
+  String? customerPhone;
+  bool isPaid;
+  List> itemsSummary;
+
+  SaleRecord({
+    required this.id,
+    required this.date,
+    required this.time,
+    required this.totalAmount,
+    required this.paymentMode,
+    this.customerName,
+    this.customerPhone,
+    this.isPaid = true,
+    required this.itemsSummary,
+  });
+
+  Map<String, dynamic> toJson() => {
+        'id': id,
+        'date': date,
+        'time': time,
+        'totalAmount': totalAmount,
+        'paymentMode': paymentMode,
+        'customerName': customerName,
+        'customerPhone': customerPhone,
+        'isPaid': isPaid,
+        'itemsSummary': itemsSummary,
+      };
+
+  factory SaleRecord.fromJson(Map<String, dynamic> json) => SaleRecord(
+        id: json['id'] ?? '',
+        date: json['date'] ?? '',
+        time: json['time'] ?? '',
+        totalAmount: (json['totalAmount'] as num?)?.toDouble() ?? 0.0,
+        paymentMode: json['paymentMode'] ?? 'Cash',
+        customerName: json['customerName'],
+        customerPhone: json['customerPhone'],
+        isPaid: json['isPaid'] ?? true,
+        itemsSummary: List>.from(json['itemsSummary'] ?? []),
+      );
+}
+
+// ----------------- ROOT NAVIGATION -----------------
+
 class MainNavigationScreen extends StatefulWidget {
   const MainNavigationScreen({super.key});
 
@@ -174,9 +154,9 @@ class MainNavigationScreen extends StatefulWidget {
 }
 
 class _MainNavigationScreenState extends State<MainNavigationScreen> {
-  int _currentIndex = 0;
+  int _currentIndex = 1; // Default: Make Bill (Centre)
   String _shopName = '';
-  String _shopSyncCode = '';
+  String _syncCode = '';
   List<ProductItem> _inventory = [];
   List<SaleRecord> _sales = [];
   bool _isLoading = true;
@@ -184,74 +164,74 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
   @override
   void initState() {
     super.initState();
-    _loadStateFromDisk();
+    _loadAllAppData();
   }
 
-  Future<void> _loadStateFromDisk() async {
+  Future<void> _loadAllAppData() async {
     final prefs = await SharedPreferences.getInstance();
-    final invString = prefs.getString('vanik_kirana_inventory_db_v4');
-    final salesString = prefs.getString('vanik_kirana_sales_db_v4');
-    final savedShop = prefs.getString('vanik_kirana_shop_name');
-    final savedCode = prefs.getString('vanik_kirana_shop_code');
+    setState(() {
+      _shopName = prefs.getString('vanik_shop_name') ?? '';
+      _syncCode = prefs.getString('vanik_sync_code') ?? '';
+      if (_syncCode.isEmpty) {
+        _syncCode = (100000 + Random().nextInt(900000)).toString();
+        prefs.setString('vanik_sync_code', _syncCode);
+      }
 
-    if (savedShop != null && savedShop.trim().isNotEmpty) {
-      _shopName = savedShop;
-    }
+      final invStr = prefs.getString('vanik_inventory');
+      if (invStr != null && invStr.isNotEmpty) {
+        final List decoded = jsonDecode(invStr);
+        _inventory = decoded.map((e) => ProductItem.fromJson(e)).toList();
+      } else {
+        _inventory = [];
+      }
 
-    if (savedCode != null && savedCode.trim().isNotEmpty) {
-      _shopSyncCode = savedCode;
-    } else {
-      _shopSyncCode = (100000 + Random().nextInt(900000)).toString();
-      await prefs.setString('vanik_kirana_shop_code', _shopSyncCode);
-    }
-
-    if (invString != null) {
-      final List dec = jsonDecode(invString);
-      _inventory = dec.map((e) => ProductItem.fromMap(e)).toList();
-    } else {
-      _inventory = []; // Clean start for any shop owner
-    }
-
-    if (salesString != null) {
-      final List dec = jsonDecode(salesString);
-      _sales = dec.map((e) => SaleRecord.fromMap(e)).toList();
-    }
-
-    setState(() => _isLoading = false);
+      final salesStr = prefs.getString('vanik_sales');
+      if (salesStr != null && salesStr.isNotEmpty) {
+        final List decoded = jsonDecode(salesStr);
+        _sales = decoded.map((e) => SaleRecord.fromJson(e)).toList();
+      } else {
+        _sales = [];
+      }
+      _isLoading = false;
+    });
 
     if (_shopName.isEmpty) {
-      WidgetsBinding.instance.addPostFrameCallback((_) => _promptShopNameSetup(isFirstTime: true));
+      WidgetsBinding.instance.addPostFrameCallback((_) => _showOnboardingModal());
     }
   }
 
-  Future<void> _commitStateToDisk() async {
+  Future<void> _saveInventory() async {
     final prefs = await SharedPreferences.getInstance();
-    await prefs.setString('vanik_kirana_inventory_db_v4', jsonEncode(_inventory.map((e) => e.toMap()).toList()));
-    await prefs.setString('vanik_kirana_sales_db_v4', jsonEncode(_sales.map((e) => e.toMap()).toList()));
-    await prefs.setString('vanik_kirana_shop_name', _shopName);
-    await prefs.setString('vanik_kirana_shop_code', _shopSyncCode);
+    final str = jsonEncode(_inventory.map((e) => e.toJson()).toList());
+    await prefs.setString('vanik_inventory', str);
   }
 
-  void _promptShopNameSetup({bool isFirstTime = false}) {
-    final nameCtrl = TextEditingController(text: _shopName);
+  Future<void> _saveSales() async {
+    final prefs = await SharedPreferences.getInstance();
+    final str = jsonEncode(_sales.map((e) => e.toJson()).toList());
+    await prefs.setString('vanik_sales', str);
+  }
+
+  void _showOnboardingModal() {
+    final controller = TextEditingController();
     showDialog(
       context: context,
-      barrierDismissible: !isFirstTime,
+      barrierDismissible: false,
       builder: (ctx) => AlertDialog(
+        backgroundColor: const Color(0xFFFBF8F2),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        title: Text(isFirstTime ? 'Dukaan Setup Karein' : 'Dukaan Ka Naam Badlein', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
+        title: const Text('Dukaan Ka Naam', style: TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF2D5A27))),
         content: Column(
           mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text('Apni dukaan ka naam daalein jo customer bill aur WhatsApp receipt par print hoga:'),
+            const Text('Apni dukaan ka naam daaliye:', style: TextStyle(fontSize: 14, color: Colors.black87)),
             const SizedBox(height: 12),
             TextField(
-              controller: nameCtrl,
-              autofocus: true,
+              controller: controller,
               decoration: InputDecoration(
-                hintText: 'e.g. Maa Durga Kirana Store',
-                labelText: 'Store / Owner Name',
+                hintText: 'e.g. Mahato Electronics',
+                filled: true,
+                fillColor: Colors.white,
                 border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
               ),
             ),
@@ -260,196 +240,100 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
         actions: [
           ElevatedButton(
             style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFF2D5A27),
-              foregroundColor: Colors.white,
-              minimumSize: const Size(double.infinity, 44),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              backgroundColor: const Color(0xFFD9822B),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
             ),
-            onPressed: () {
-              if (nameCtrl.text.trim().isNotEmpty) {
-                setState(() => _shopName = nameCtrl.text.trim());
-                _commitStateToDisk();
-                Navigator.pop(ctx);
+            onPressed: () async {
+              if (controller.text.trim().isNotEmpty) {
+                final name = controller.text.trim();
+                final prefs = await SharedPreferences.getInstance();
+                await prefs.setString('vanik_shop_name', name);
+                setState(() => _shopName = name);
+                if (ctx.mounted) Navigator.pop(ctx);
               }
             },
-            child: const Text('Save & Continue', style: TextStyle(fontWeight: FontWeight.bold)),
+            child: const Text('Shuru Karein', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
           ),
         ],
       ),
     );
   }
 
-  void _openSyncAndStaffDialog() {
-    final codeCtrl = TextEditingController();
+  void _showShopCodeModal() {
+    final joinController = TextEditingController();
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
+        backgroundColor: const Color(0xFFFBF8F2),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        title: const Text('Shop Staff & Multi-User Sync', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+        title: Row(
+          children: [
+            const Icon(Icons.sync, color: Color(0xFF2D5A27)),
+            const SizedBox(width: 8),
+            Text(_shopName.isEmpty ? 'Multi-Staff Sync' : _shopName, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+          ],
+        ),
         content: Column(
           mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            const Text('Aapki dukaan ka Unique Sync Code hai:', style: TextStyle(fontSize: 13, color: Colors.black54)),
+            const SizedBox(height: 8),
             Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(color: const Color(0xFFFBF8F2), borderRadius: BorderRadius.circular(12), border: Border.all(color: const Color(0xFFE8DFC8))),
-              child: Column(
-                children: [
-                  const Text('Aapki Dukaan Ka Joining Code:', style: TextStyle(fontSize: 12, color: Colors.grey)),
-                  const SizedBox(height: 4),
-                  Text(_shopSyncCode, style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold, letterSpacing: 3, color: Color(0xFF2D5A27))),
-                  const SizedBox(height: 4),
-                  const Text('Staff ke phone me ye code daalkar sync karein', textAlign: TextAlign.center, style: TextStyle(fontSize: 11, color: Colors.grey)),
-                ],
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(vertical: 12),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: const Color(0xFF2D5A27), width: 1.5),
+              ),
+              child: Center(
+                child: Text(
+                  _syncCode,
+                  style: const TextStyle(fontSize: 26, letterSpacing: 6, fontWeight: FontWeight.bold, color: Color(0xFF2D5A27)),
+                ),
               ),
             ),
             const SizedBox(height: 16),
             const Divider(),
             const SizedBox(height: 8),
-            const Text('Doosri dukaan se judna chahte hain?', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+            const Text('Doosre phone se judne ke liye code daalein:', style: TextStyle(fontSize: 12, color: Colors.black87)),
             const SizedBox(height: 8),
             TextField(
-              controller: codeCtrl,
+              controller: joinController,
               keyboardType: TextInputType.number,
               decoration: InputDecoration(
-                hintText: 'Enter 6-digit Code',
-                labelText: 'Join Shop Code',
+                hintText: '6-digit shop code',
+                filled: true,
+                fillColor: Colors.white,
+                contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                 border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
               ),
             ),
           ],
         ),
         actions: [
-          Row(
-            children: [
-              Expanded(
-                child: TextButton(
-                  onPressed: () => Navigator.pop(ctx),
-                  child: const Text('Close'),
-                ),
-              ),
-              Expanded(
-                child: ElevatedButton(
-                  style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFFD9822B), foregroundColor: Colors.white),
-                  onPressed: () {
-                    if (codeCtrl.text.trim().isNotEmpty) {
-                      setState(() => _shopSyncCode = codeCtrl.text.trim());
-                      _commitStateToDisk();
-                      Navigator.pop(ctx);
-                      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Shop Joining Code updated successfully!')));
-                    }
-                  },
-                  child: const Text('Join Shop'),
-                ),
-              ),
-            ],
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Close', style: TextStyle(color: Colors.grey)),
           ),
-        ],
-      ),
-    );
-  }
-
-  void _recordNewSale(SaleRecord sale) {
-    setState(() {
-      _sales.insert(0, sale);
-      for (final cartItem in sale.items) {
-        final idx = _inventory.indexWhere((p) => p.barcode == cartItem.product.barcode);
-        if (idx >= 0) {
-          _inventory[idx].stock = (_inventory[idx].stock - cartItem.quantity).clamp(0.0, 999999.0);
-        }
-      }
-    });
-    _commitStateToDisk();
-  }
-
-  void _saveOrUpdateProduct(ProductItem item) {
-    setState(() {
-      final idx = _inventory.indexWhere((p) => p.barcode == item.barcode);
-      if (idx >= 0) {
-        _inventory[idx] = item;
-      } else {
-        _inventory.add(item);
-      }
-    });
-    _commitStateToDisk();
-  }
-
-  void _deleteProduct(String barcode) {
-    setState(() {
-      _inventory.removeWhere((p) => p.barcode == barcode);
-    });
-    _commitStateToDisk();
-  }
-
-  void _settleUdhaarRecord(String saleId) {
-    setState(() {
-      final s = _sales.firstWhere((x) => x.id == saleId);
-      s.isPaid = true;
-    });
-    _commitStateToDisk();
-  }
-
-  Widget _buildTopProfileHeader() {
-    final title = _shopName.isEmpty ? 'Setup Shop' : _shopName;
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          InkWell(
-            onTap: () => _promptShopNameSetup(isFirstTime: false),
-            borderRadius: BorderRadius.circular(14),
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(14),
-                border: Border.all(color: const Color(0xFFE8DFC8)),
-              ),
-              child: Row(
-                children: [
-                  const CircleAvatar(radius: 12, backgroundColor: Color(0xFFE8DFC8), child: Icon(Icons.person, size: 16, color: Color(0xFF7FA06B))),
-                  const SizedBox(width: 8),
-                  Text(
-                    title.length > 15 ? '${title.substring(0, 14)}...' : title,
-                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
-                  ),
-                  const SizedBox(width: 4),
-                  const Icon(Icons.edit, size: 13, color: Colors.grey),
-                ],
-              ),
-            ),
-          ),
-          Row(
-            children: [
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(14),
-                  border: Border.all(color: const Color(0xFFE8DFC8)),
-                ),
-                child: Row(
-                  children: [
-                    const Icon(Icons.shopping_bag_outlined, size: 16, color: Color(0xFFD9822B)),
-                    const SizedBox(width: 4),
-                    Text('Orders: ${_sales.length}', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Color(0xFF2D5A27))),
-                  ],
-                ),
-              ),
-              const SizedBox(width: 8),
-              InkWell(
-                onTap: _openSyncAndStaffDialog,
-                child: Container(
-                  padding: const EdgeInsets.all(8),
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(14),
-                    border: Border.all(color: const Color(0xFFE8DFC8)),
-                  ),
-                  child: const Icon(Icons.verified, size: 18, color: Color(0xFF7FA06B)),
-                ),
-              ),
-            ],
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF2D5A27)),
+            onPressed: () async {
+              if (joinController.text.trim().length == 6) {
+                final newCode = joinController.text.trim();
+                final prefs = await SharedPreferences.getInstance();
+                await prefs.setString('vanik_sync_code', newCode);
+                setState(() => _syncCode = newCode);
+                if (ctx.mounted) {
+                  Navigator.pop(ctx);
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text('Shop sync code updated to $newCode!')),
+                  );
+                }
+              }
+            },
+            child: const Text('Join Shop', style: TextStyle(color: Colors.white)),
           ),
         ],
       ),
@@ -459,83 +343,109 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
   @override
   Widget build(BuildContext context) {
     if (_isLoading) {
-      return const Scaffold(body: Center(child: CircularProgressIndicator()));
+      return const Scaffold(body: Center(child: CircularProgressIndicator(color: Color(0xFF2D5A27))));
     }
 
-    final views = [
+    final pages = [
       MyShopScreen(
+        shopName: _shopName,
         inventory: _inventory,
-        onProductUpdated: _saveOrUpdateProduct,
-        onProductDeleted: _deleteProduct,
+        onInventoryUpdated: _saveInventory,
       ),
       MakeBillScreen(
+        shopName: _shopName,
         inventory: _inventory,
-        shopName: _shopName.isEmpty ? 'Kirana General Store' : _shopName,
-        onSaleSuccess: _recordNewSale,
-        onProductAddOrUpdate: _saveOrUpdateProduct,
+        onInventoryUpdated: _saveInventory,
+        onBillCompleted: (SaleRecord newSale) async {
+          setState(() {
+            _sales.insert(0, newSale);
+          });
+          await _saveSales();
+          await _saveInventory();
+        },
+        onProfileTap: _showShopCodeModal,
       ),
       MySalesScreen(
+        shopName: _shopName,
         sales: _sales,
-        shopName: _shopName.isEmpty ? 'Kirana Store' : _shopName,
-        onUdhaarCleared: _settleUdhaarRecord,
+        onSalesUpdated: _saveSales,
       ),
     ];
 
     return Scaffold(
-      body: SafeArea(
-        child: Column(
-          children: [
-            _buildTopProfileHeader(),
-            Expanded(child: views[_currentIndex]),
-          ],
-        ),
-      ),
+      body: pages[_currentIndex],
       bottomNavigationBar: Container(
-        height: 72,
         decoration: BoxDecoration(
           color: Colors.white,
-          border: Border(top: BorderSide(color: Colors.grey.shade200)),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.06),
+              blurRadius: 10,
+              offset: const Offset(0, -3),
+            ),
+          ],
         ),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.spaceAround,
+        child: SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 6.0),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceAround,
+              children: [
+                _buildNavItem(0, Icons.storefront_outlined, 'My Shop'),
+                _buildCenterBillingItem(1, Icons.receipt_long, 'Make Bill'),
+                _buildNavItem(2, Icons.account_balance_wallet_outlined, 'My Sales'),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+ Widget _buildNavItem(int index, IconData icon, String label) {
+    final isSelected = _currentIndex == index;
+    return GestureDetector(
+      onTap: () => setState(() => _currentIndex = index),
+      behavior: HitTestBehavior.opaque,
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 24, color: isSelected ? const Color(0xFF2D5A27) : Colors.black54),
+          const SizedBox(height: 3),
+          Text(
+            label,
+            style: TextStyle(
+              fontSize: 12,
+              fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
+              color: isSelected ? const Color(0xFF2D5A27) : Colors.black54,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildCenterBillingItem(int index, IconData icon, String label) {
+    final isSelected = _currentIndex == index;
+    return GestureDetector(
+      onTap: () => setState(() => _currentIndex = index),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 6),
+        decoration: BoxDecoration(
+          color: isSelected ? const Color(0xFF86A873) : Colors.transparent,
+          borderRadius: BorderRadius.circular(16),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
           children: [
-            InkWell(
-              onTap: () => setState(() => _currentIndex = 0),
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(Icons.storefront, color: _currentIndex == 0 ? const Color(0xFF2D5A27) : Colors.grey),
-                  Text('My Shop', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: _currentIndex == 0 ? const Color(0xFF2D5A27) : Colors.grey)),
-                ],
-              ),
-            ),
-            GestureDetector(
-              onTap: () => setState(() => _currentIndex = 1),
-              child: Container(
-                width: 58,
-                height: 58,
-                decoration: BoxDecoration(
-                  color: const Color(0xFF7FA06B),
-                  borderRadius: BorderRadius.circular(18),
-                  boxShadow: const [BoxShadow(color: Colors.black26, blurRadius: 4, offset: Offset(0, 2))],
-                ),
-                child: const Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Icon(Icons.receipt, color: Colors.white, size: 24),
-                    Text('Make Bill', style: TextStyle(color: Colors.white, fontSize: 9, fontWeight: FontWeight.bold)),
-                  ],
-                ),
-              ),
-            ),
-            InkWell(
-              onTap: () => setState(() => _currentIndex = 2),
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(Icons.account_balance_wallet_outlined, color: _currentIndex == 2 ? const Color(0xFF2D5A27) : Colors.grey),
-                  Text('My Sales', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: _currentIndex == 2 ? const Color(0xFF2D5A27) : Colors.grey)),
-                ],
+            Icon(icon, size: 24, color: isSelected ? Colors.white : Colors.black54),
+            const SizedBox(height: 2),
+            Text(
+              label,
+              style: TextStyle(
+                fontSize: 11,
+                fontWeight: FontWeight.bold,
+                color: isSelected ? Colors.white : Colors.black54,
               ),
             ),
           ],
@@ -544,21 +454,23 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
     );
   }
 }
-// ==========================================
-// 4. SCREEN: MAKE BILL (SCANNER & CART)
-// ==========================================
+
+// ----------------- SCREEN 2: MAKE BILL (SCANNER, BEATS, EDIT, UDHAAR) -----------------
+
 class MakeBillScreen extends StatefulWidget {
-  final List<ProductItem> inventory;
   final String shopName;
-  final Function(SaleRecord) onSaleSuccess;
-  final Function(ProductItem) onProductAddOrUpdate;
+  final List<ProductItem> inventory;
+  final VoidCallback onInventoryUpdated;
+  final Function(SaleRecord) onBillCompleted;
+  final VoidCallback onProfileTap;
 
   const MakeBillScreen({
     super.key,
-    required this.inventory,
     required this.shopName,
-    required this.onSaleSuccess,
-    required this.onProductAddOrUpdate,
+    required this.inventory,
+    required this.onInventoryUpdated,
+    required this.onBillCompleted,
+    required this.onProfileTap,
   });
 
   @override
@@ -566,248 +478,213 @@ class MakeBillScreen extends StatefulWidget {
 }
 
 class _MakeBillScreenState extends State<MakeBillScreen> {
+  final MobileScannerController _scannerController = MobileScannerController(
+    detectionSpeed: DetectionSpeed.noDuplicates,
+    facing: CameraFacing.back,
+  );
+  bool _isTorchOn = false;
   final List<CartItem> _cart = [];
+  String? _lastScannedCode;
   DateTime _lastScanTime = DateTime.now();
 
-  double get _currentBillTotal => _cart.fold(0.0, (sum, item) => sum + item.total);
+  double get _totalBill => _cart.fold(0.0, (sum, item) => sum + item.total);
 
-  void _onBarcodeDetected(BarcodeCapture capture) {
+  void _handleBarcodeDetected(BarcodeCapture capture) {
+    final barcodes = capture.barcodes;
+    if (barcodes.isEmpty) return;
+    final code = barcodes.first.rawValue;
+    if (code == null || code.trim().isEmpty) return;
+
     final now = DateTime.now();
-    if (now.difference(_lastScanTime).inMilliseconds < 1600) return;
+    if (_lastScannedCode == code && now.difference(_lastScanTime).inMilliseconds < 1200) {
+      return; // prevent multi-firing within 1.2s for identical packet position
+    }
+    _lastScannedCode = code;
     _lastScanTime = now;
 
-    for (final barcode in capture.barcodes) {
-      final code = barcode.rawValue;
-      if (code != null && code.trim().isNotEmpty) {
-        _processDetectedBarcode(code.trim());
-        break;
-      }
-    }
-  }
+    // Instant Sound Beep + Vibration
+    SystemSound.play(SystemSoundType.click);
+    HapticFeedback.lightImpact();
 
-  void _processDetectedBarcode(String code) {
-    final matches = widget.inventory.where((p) => p.barcode == code).toList();
-    if (matches.isNotEmpty) {
-      _displayAddToCartSheet(matches.first);
+    // Look up in inventory
+    final index = widget.inventory.indexWhere((p) => p.barcode == code);
+    if (index != -1) {
+      final product = widget.inventory[index];
+      _addToCart(product, 1.0, product.sellingPrice);
     } else {
-      _displayNewBarcodePrompt(code);
+      // New Unregistered Barcode: Ask for quick selling price and place in Pending Catalog
+      _showQuickAddPendingModal(code);
     }
   }
 
-  void _displayAddToCartSheet(ProductItem item) {
-    final qtyCtrl = TextEditingController(text: item.type == ItemType.loose ? '1.0' : '1');
-    final priceCtrl = TextEditingController(text: item.sellingPrice.toStringAsFixed(0));
+  void _addToCart(ProductItem product, double qty, double price) {
+    setState(() {
+      final existingIndex = _cart.indexWhere((item) => item.product.barcode == product.barcode && !item.product.isLoose);
+      if (existingIndex != -1) {
+        _cart[existingIndex].quantity += qty;
+      } else {
+        _cart.add(CartItem(product: product, quantity: qty, unitPrice: price));
+      }
+    });
+  }
+
+  void _showQuickAddPendingModal(String barcode) {
+    final nameCtrl = TextEditingController(text: 'Item $barcode');
+    final priceCtrl = TextEditingController(text: '10');
 
     showDialog(
       context: context,
+      barrierDismissible: false,
       builder: (ctx) => AlertDialog(
+        backgroundColor: const Color(0xFFFBF8F2),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: Text(item.name, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+        title: const Text('Naya Item Detect Hua', style: TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF2D5A27))),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            if (item.imagePath.isNotEmpty)
-              ClipRRect(
-                borderRadius: BorderRadius.circular(8),
-                child: Image.file(File(item.imagePath), height: 75, width: 75, fit: BoxFit.cover, errorBuilder: (_, __, ___) => const Icon(Icons.inventory, size: 50)),
-              ),
-            const SizedBox(height: 12),
-            TextField(
-              controller: qtyCtrl,
-              keyboardType: const TextInputType.numberWithOptions(decimal: true),
-              autofocus: true,
-              decoration: InputDecoration(
-                labelText: item.type == ItemType.loose ? 'Weight (in Kg)' : 'Quantity (Pieces)',
-                border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
-              ),
-            ),
-            const SizedBox(height: 10),
-            TextField(
-              controller: priceCtrl,
-              keyboardType: const TextInputType.numberWithOptions(decimal: true),
-              decoration: InputDecoration(
-                labelText: 'Unit Rate (₹)',
-                border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
-              ),
-            ),
+            TextField(controller: nameCtrl, decoration: const InputDecoration(labelText: 'Product Name')),
+            const SizedBox(height: 8),
+            TextField(controller: priceCtrl, keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: 'Selling Price (₹)')),
           ],
         ),
         actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
           ElevatedButton(
-            style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFF2D5A27),
-              foregroundColor: Colors.white,
-              minimumSize: const Size(double.infinity, 44),
-            ),
+            style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF2D5A27)),
             onPressed: () {
-              final q = double.tryParse(qtyCtrl.text) ?? 1.0;
-              final p = double.tryParse(priceCtrl.text) ?? item.sellingPrice;
-              setState(() {
-                final idx = _cart.indexWhere((c) => c.product.barcode == item.barcode);
-                if (idx >= 0) {
-                  _cart[idx].quantity += q;
-                  _cart[idx].customPrice = p;
-                } else {
-                  _cart.add(CartItem(product: item, quantity: q, customPrice: p));
-                }
-              });
+              final name = nameCtrl.text.trim();
+              final price = double.tryParse(priceCtrl.text.trim()) ?? 10.0;
+              final newProd = ProductItem(
+                barcode: barcode,
+                name: name,
+                sellingPrice: price,
+                purchasePrice: 0.0,
+                stock: 0.0,
+                isPending: true,
+              );
+              widget.inventory.add(newProd);
+              widget.onInventoryUpdated();
+              _addToCart(newProd, 1.0, price);
               Navigator.pop(ctx);
             },
-            child: const Text('Add to Current Bill', style: TextStyle(fontWeight: FontWeight.bold)),
+            child: const Text('Add to Bill', style: TextStyle(color: Colors.white)),
           ),
         ],
       ),
     );
   }
 
-  void _displayNewBarcodePrompt(String code) {
-    final nameCtrl = TextEditingController();
-    final priceCtrl = TextEditingController();
+   // Exact Pencil Edit Modal
+  void _openPencilEditModal(CartItem item) {
+    final qtyCtrl = TextEditingController(text: item.quantity.toString().replaceAll(RegExp(r'\.0$'), ''));
+    final priceCtrl = TextEditingController(text: item.unitPrice.toString().replaceAll(RegExp(r'\.0$'), ''));
 
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: Text('New Barcode: $code', textAlign: TextAlign.center, style: const TextStyle(fontSize: 13, color: Colors.grey)),
+        backgroundColor: Colors.white,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        contentPadding: const EdgeInsets.all(20),
         content: Column(
           mainAxisSize: MainAxisSize.min,
-          children: [
-            TextField(controller: nameCtrl, autofocus: true, decoration: const InputDecoration(labelText: 'Product Name', border: OutlineInputBorder())),
-            const SizedBox(height: 10),
-            TextField(controller: priceCtrl, keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: 'Selling Price (₹)', border: OutlineInputBorder())),
-          ],
-        ),
-        actions: [
-          ElevatedButton(
-            style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFFD9822B), foregroundColor: Colors.white, minimumSize: const Size(double.infinity, 44)),
-            onPressed: () {
-              final p = double.tryParse(priceCtrl.text) ?? 0.0;
-              if (p > 0) {
-                final newItem = ProductItem(
-                  id: 'itm_${DateTime.now().millisecondsSinceEpoch}',
-                  name: nameCtrl.text.trim().isNotEmpty ? nameCtrl.text.trim() : 'Item $code',
-                  barcode: code,
-                  sellingPrice: p,
-                  stock: 0.0,
-                  type: ItemType.piece,
-                  isPending: true,
-                );
-                widget.onProductAddOrUpdate(newItem);
-                setState(() => _cart.add(CartItem(product: newItem, quantity: 1.0, customPrice: p)));
-                Navigator.pop(ctx);
-              }
-            },
-            child: const Text('Save & Add to Bill'),
-          ),
-        ],
-      ),
-    );
-  }
-
-  void _finalizeTransaction(PaymentMethod method) {
-    if (_cart.isEmpty) return;
-
-    if (method == PaymentMethod.udhaar) {
-      final phoneCtrl = TextEditingController();
-      showDialog(
-        context: context,
-        builder: (ctx) => AlertDialog(
-          title: const Text('Customer Udhaar Khata', style: TextStyle(color: Color(0xFFD9822B), fontWeight: FontWeight.bold)),
-          content: TextField(
-            controller: phoneCtrl,
-            keyboardType: TextInputType.phone,
-            autofocus: true,
-            decoration: const InputDecoration(labelText: 'Customer Mobile Number', border: OutlineInputBorder()),
-          ),
-          actions: [
-            ElevatedButton(
-              style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFFD9822B), foregroundColor: Colors.white),
-              onPressed: () {
-                if (phoneCtrl.text.trim().isNotEmpty) {
-                  final sale = SaleRecord(
-                    id: DateTime.now().millisecondsSinceEpoch.toString(),
-                    date: DateTime.now(),
-                    items: List.from(_cart),
-                    total: _currentBillTotal,
-                    profit: _cart.fold(0.0, (s, i) => s + i.profit),
-                    method: PaymentMethod.udhaar,
-                    customerPhone: phoneCtrl.text.trim(),
-                    isPaid: false,
-                  );
-                  widget.onSaleSuccess(sale);
-                  setState(() => _cart.clear());
-                  Navigator.pop(ctx);
-                  _openThermalReceiptModal(sale);
-                }
-              },
-              child: const Text('Save Udhaar Record'),
-            ),
-          ],
-        ),
-      );
-    } else {
-      final sale = SaleRecord(
-        id: DateTime.now().millisecondsSinceEpoch.toString(),
-        date: DateTime.now(),
-        items: List.from(_cart),
-        total: _currentBillTotal,
-        profit: _cart.fold(0.0, (s, i) => s + i.profit),
-        method: method,
-      );
-      widget.onSaleSuccess(sale);
-      setState(() => _cart.clear());
-      _openThermalReceiptModal(sale);
-    }
-  }
-
-  void _openThermalReceiptModal(SaleRecord sale) {
-    showDialog(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        contentPadding: const EdgeInsets.all(16),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Row(
-              mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                const Icon(Icons.receipt_long, color: Color(0xFF2D5A27)),
-                const SizedBox(width: 8),
-                Text('${widget.shopName} Bill', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-              ],
-            ),
-            const Divider(),
-            ...sale.items.map((i) => Padding(
-              padding: const EdgeInsets.symmetric(vertical: 2),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Expanded(child: Text('${i.product.name} x ${i.quantity}')),
-                  Text('₹${i.total.toStringAsFixed(0)}', style: const TextStyle(fontWeight: FontWeight.bold)),
-                ],
-              ),
-            )),
-            const Divider(),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                const Text('Total Bill:', style: TextStyle(fontWeight: FontWeight.bold)),
-                Text(
-                  '₹${sale.total.toStringAsFixed(0)}',
-                  style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Color(0xFF2D5A27)),
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(10),
+                  child: Container(
+                    width: 50,
+                    height: 50,
+                    color: const Color(0xFFF3ECE1),
+                    child: item.product.imagePath != null
+                        ? Image.file(File(item.product.imagePath!), fit: BoxFit.cover)
+                        : const Icon(Icons.inventory_2, color: Color(0xFF2D5A27)),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                    decoration: BoxDecoration(color: const Color(0xFFFBF8F2), borderRadius: BorderRadius.circular(10)),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text('Product name', style: TextStyle(fontSize: 10, color: Colors.black54)),
+                        Text(item.product.name, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+                      ],
+                    ),
+                  ),
                 ),
               ],
             ),
-            const SizedBox(height: 14),
-            ElevatedButton.icon(
-              style: ElevatedButton.styleFrom(backgroundColor: Colors.green, foregroundColor: Colors.white, minimumSize: const Size(double.infinity, 42)),
-              onPressed: () {
-                final text = "${widget.shopName} Bill\nTotal: ₹${sale.total.toStringAsFixed(0)}\nItems: ${sale.items.length}\nThank you for shopping with us!";
-                launchUrl(Uri.parse("https://wa.me/?text=${Uri.encodeComponent(text)}"));
-              },
-              icon: const Icon(Icons.share, size: 18),
-              label: const Text('Share Receipt on WhatsApp'),
+            const SizedBox(height: 16),
+            Container(
+              decoration: BoxDecoration(border: Border.all(color: Colors.black12), borderRadius: BorderRadius.circular(12)),
+              child: Column(
+                children: [
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        const Text('How many Pieces?', style: TextStyle(fontSize: 13, color: Colors.black87)),
+                        SizedBox(
+                          width: 80,
+                          child: TextField(
+                            controller: qtyCtrl,
+                            keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                            textAlign: TextAlign.center,
+                            decoration: const InputDecoration(border: InputBorder.none),
+                            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const Divider(height: 1),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        const Text('Discounted price of 1 Piece\n(₹)', style: TextStyle(fontSize: 12, color: Colors.black87)),
+                        SizedBox(
+                          width: 80,
+                          child: TextField(
+                            controller: priceCtrl,
+                            keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                            textAlign: TextAlign.center,
+                            decoration: const InputDecoration(border: InputBorder.none),
+                            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 20),
+            SizedBox(
+              width: double.infinity,
+              height: 48,
+              child: ElevatedButton(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF86A873),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                ),
+                onPressed: () {
+                  final newQty = double.tryParse(qtyCtrl.text.trim()) ?? item.quantity;
+                  final newPrice = double.tryParse(priceCtrl.text.trim()) ?? item.unitPrice;
+                  setState(() {
+                    item.quantity = newQty;
+                    item.unitPrice = newPrice;
+                  });
+                  Navigator.pop(ctx);
+                },
+                child: const Text('OK', style: TextStyle(fontSize: 16, color: Colors.white, fontWeight: FontWeight.bold)),
+              ),
             ),
           ],
         ),
@@ -815,200 +692,1045 @@ class _MakeBillScreenState extends State<MakeBillScreen> {
     );
   }
 
-  void _openLooseItemSelection() {
-    final looseList = widget.inventory.where((p) => p.type == ItemType.loose).toList();
+  // Smart Dual Calculation Loose Item Modal
+  void _openLooseItemSelectionModal() {
+    final looseProducts = widget.inventory.where((p) => p.isLoose).toList();
+
     showModalBottomSheet(
       context: context,
-      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(16))),
-      builder: (c) => Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          children: [
-            const Text('Select Loose Item (Weight)', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-            const SizedBox(height: 8),
-            Expanded(
-              child: looseList.isEmpty
-                  ? const Center(child: Text('No loose items in shop yet.'))
-                  : ListView.builder(
-                      itemCount: looseList.length,
-                      itemBuilder: (ctx, i) {
-                        final item = looseList[i];
-                        return ListTile(
-                          leading: ClipRRect(
-                            borderRadius: BorderRadius.circular(8),
-                            child: item.imagePath.isNotEmpty
-                                ? Image.file(File(item.imagePath), width: 44, height: 44, fit: BoxFit.cover, errorBuilder: (_, __, ___) => const Icon(Icons.scale, size: 36))
-                                : const CircleAvatar(backgroundColor: Color(0xFFE8DFC8), child: Icon(Icons.scale, color: Color(0xFF2D5A27))),
-                          ),
-                          title: Text(item.name, style: const TextStyle(fontWeight: FontWeight.bold)),
-                          subtitle: Text('Rate: ₹${item.sellingPrice.toStringAsFixed(0)}/kg | Stock: ${item.stock.toStringAsFixed(0)} kg'),
-                          onTap: () {
-                            Navigator.pop(c);
-                            _displayAddToCartSheet(item);
-                          },
-                        );
-                      },
+      isScrollControlled: true,
+      backgroundColor: const Color(0xFFFBF8F2),
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
+      builder: (ctx) {
+        return StatefulBuilder(
+          builder: (modalCtx, setModalState) {
+            return Padding(
+              padding: EdgeInsets.only(
+                bottom: MediaQuery.of(modalCtx).viewInsets.bottom + 16,
+                top: 16,
+                left: 16,
+                right: 16,
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      const Text('Khula Samaan (Loose Item)', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Color(0xFF2D5A27))),
+                      IconButton(icon: const Icon(Icons.close), onPressed: () => Navigator.pop(modalCtx)),
+                    ],
+                  ),
+                  const SizedBox(height: 10),
+                  if (looseProducts.isEmpty)
+                    const Padding(
+                      padding: EdgeInsets.symmetric(vertical: 24),
+                      child: Center(child: Text('My Shop me jaakar Loose Item add karein.')),
+                    )
+                  else
+                    ConstrainedBox(
+                      constraints: const BoxConstraints(maxHeight: 260),
+                      child: ListView.builder(
+                        shrinkWrap: true,
+                        itemCount: looseProducts.length,
+                        itemBuilder: (c, i) {
+                          final item = looseProducts[i];
+                          return Card(
+                            color: Colors.white,
+                            elevation: 0,
+                            margin: const EdgeInsets.only(bottom: 8),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
+                              side: const BorderSide(color: Colors.black12),
+                            ),
+                            child: ListTile(
+                              leading: ClipRRect(
+                                borderRadius: BorderRadius.circular(8),
+                                child: Container(
+                                  width: 40,
+                                  height: 40,
+                                  color: const Color(0xFFE8DFC8),
+                                  child: item.imagePath != null
+                                      ? Image.file(File(item.imagePath!), fit: BoxFit.cover)
+                                      : const Icon(Icons.scale, color: Color(0xFF2D5A27)),
+                                ),
+                              ),
+                              title: Text(item.name, style: const TextStyle(fontWeight: FontWeight.bold)),
+                              subtitle: Text('Rate: ₹${item.sellingPrice}/kg | Stock: ${item.stock} kg'),
+                              trailing: ElevatedButton(
+                                style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFFD9822B)),
+                                onPressed: () {
+                                  Navigator.pop(modalCtx);
+                                  _showSmartWeightCalculationDialog(item);
+                                },
+                                child: const Text('Select', style: TextStyle(color: Colors.white)),
+                              ),
+                            ),
+                          );
+                        },
+                      ),
                     ),
+                ],
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
+  void _showSmartWeightCalculationDialog(ProductItem item) {
+    final weightCtrl = TextEditingController(text: '1.0');
+    final amountCtrl = TextEditingController(text: item.sellingPrice.toStringAsFixed(0));
+    bool isUpdating = false;
+
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: Colors.white,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: Text('${item.name} (₹${item.sellingPrice}/kg)', style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextField(
+              controller: weightCtrl,
+              keyboardType: const TextInputType.numberWithOptions(decimal: true),
+              decoration: const InputDecoration(
+                labelText: 'Wajan (in Kg, e.g. 0.250 for 250g)',
+                suffixText: 'kg',
+              ),
+              onChanged: (val) {
+                if (isUpdating) return;
+                isUpdating = true;
+                final w = double.tryParse(val) ?? 0.0;
+                final amt = w * item.sellingPrice;
+                amountCtrl.text = amt.toStringAsFixed(2).replaceAll(RegExp(r'\.00$'), '');
+                isUpdating = false;
+              },
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: amountCtrl,
+              keyboardType: const TextInputType.numberWithOptions(decimal: true),
+              decoration: const InputDecoration(
+                labelText: 'Rupaye (₹ se calculation, e.g. ₹10)',
+                prefixText: '₹ ',
+              ),
+              onChanged: (val) {
+                if (isUpdating) return;
+                isUpdating = true;
+                final a = double.tryParse(val) ?? 0.0;
+                if (item.sellingPrice > 0) {
+                  final w = a / item.sellingPrice;
+                  weightCtrl.text = w.toStringAsFixed(3).replaceAll(RegExp(r'0+$'), '').replaceAll(RegExp(r'\.$'), '');
+                }
+                isUpdating = false;
+              },
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF2D5A27)),
+            onPressed: () {
+              final w = double.tryParse(weightCtrl.text.trim()) ?? 0.0;
+              if (w > 0) {
+                setState(() {
+                  _cart.add(CartItem(product: item, quantity: w, unitPrice: item.sellingPrice));
+                  item.stock = max(0.0, item.stock - w);
+                });
+                widget.onInventoryUpdated();
+              }
+              Navigator.pop(ctx);
+            },
+            child: const Text('Add to Bill', style: TextStyle(color: Colors.white)),
+          ),
+        ],
+      ),
+    );
+  }
+
+ // Udhaar Confirmation Dialog
+  void _openUdhaarModal() {
+    if (_cart.isEmpty) return;
+    final nameCtrl = TextEditingController();
+    final phoneCtrl = TextEditingController();
+
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: const Color(0xFFFBF8F2),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: const Text('Customer Udhaar Khata', style: TextStyle(fontWeight: FontWeight.bold, color: Color(0xFFD9822B))),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextField(
+              controller: nameCtrl,
+              decoration: InputDecoration(
+                labelText: 'Customer Name',
+                filled: true,
+                fillColor: Colors.white,
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+              ),
+            ),
+            const SizedBox(height: 10),
+            TextField(
+              controller: phoneCtrl,
+              keyboardType: TextInputType.phone,
+              decoration: InputDecoration(
+                labelText: 'Customer Mobile Number',
+                filled: true,
+                fillColor: Colors.white,
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFFD9822B)),
+            onPressed: () {
+              final phone = phoneCtrl.text.trim();
+              final name = nameCtrl.text.trim().isEmpty ? 'Grahak' : nameCtrl.text.trim();
+              Navigator.pop(ctx);
+              _finalizeBilling('Udhaar', custName: name, custPhone: phone, isPaid: false);
+            },
+            child: const Text('Save Udhaar Record', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _finalizeBilling(String mode, {String? custName, String? custPhone, bool isPaid = true}) {
+    if (_cart.isEmpty) return;
+
+    final now = DateTime.now();
+    final dateStr = "${now.year}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}";
+    final timeStr = "${now.hour.toString().padLeft(2, '0')}:${now.minute.toString().padLeft(2, '0')}";
+
+    final summary = _cart
+        .map((e) => {
+              'name': e.product.name,
+              'qty': e.quantity,
+              'rate': e.unitPrice,
+              'total': e.total,
+            })
+        .toList();
+
+    // Deduct stock for packaged items
+    for (var c in _cart) {
+      if (!c.product.isLoose) {
+        c.product.stock = max(0.0, c.product.stock - c.quantity);
+      }
+    }
+    widget.onInventoryUpdated();
+
+    final sale = SaleRecord(
+      id: DateTime.now().millisecondsSinceEpoch.toString(),
+      date: dateStr,
+      time: timeStr,
+      totalAmount: _totalBill,
+      paymentMode: mode,
+      customerName: custName,
+      customerPhone: custPhone,
+      isPaid: isPaid,
+      itemsSummary: summary,
+    );
+
+    widget.onBillCompleted(sale);
+
+    // Show thermal whatsapp confirmation
+    _showInvoiceThermalSuccessSheet(sale);
+
+    setState(() {
+      _cart.clear();
+    });
+  }
+
+  void _showInvoiceThermalSuccessSheet(SaleRecord sale) {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
+      builder: (ctx) => Padding(
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(Icons.check_circle, size: 50, color: Color(0xFF2D5A27)),
+            const SizedBox(height: 8),
+            Text('Bill Paid: ₹${sale.totalAmount.toStringAsFixed(0)}', style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+            Text('Mode: ${sale.paymentMode}', style: const TextStyle(color: Colors.black54)),
+            const SizedBox(height: 16),
+            SizedBox(
+              width: double.infinity,
+              height: 48,
+              child: ElevatedButton.icon(
+                style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF25D366)),
+                icon: const Icon(Icons.share, color: Colors.white),
+                label: const Text('Share WhatsApp Receipt', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                onPressed: () {
+                  Navigator.pop(ctx);
+                  _shareWhatsAppBill(sale);
+                },
+              ),
             ),
           ],
         ),
       ),
     );
+  }
+
+  void _shareWhatsAppBill(SaleRecord sale) async {
+    final buffer = StringBuffer();
+    buffer.writeln("*${widget.shopName}*");
+    buffer.writeln("Date: ${sale.date} ${sale.time}");
+    buffer.writeln("--------------------------");
+    for (var item in sale.itemsSummary) {
+      buffer.writeln("${item['name']} x ${item['qty']} = ₹${item['total']}");
+    }
+    buffer.writeln("--------------------------");
+    buffer.writeln("*Total Bill: ₹${sale.totalAmount}*");
+    buffer.writeln("Status: ${sale.paymentMode} ${sale.isPaid ? '(Paid)' : '(Udhaar Baaki)'}");
+    buffer.writeln("\nDhanyawad! Dobara Padhaarein.");
+
+    final text = Uri.encodeComponent(buffer.toString());
+    final phone = sale.customerPhone ?? '';
+    final url = phone.isNotEmpty ? "https://wa.me/91$phone?text=$text" : "https://wa.me/?text=$text";
+    final uri = Uri.parse(url);
+    if (await canLaunchUrl(uri)) {
+      await launchUrl(uri, mode: LaunchMode.externalApplication);
+    }
   }
 
   @override
   Widget build(BuildContext context) {
+    return SafeArea(
+      child: Column(
+        children: [
+          // Header Bar
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 14.0, vertical: 8.0),
+            child: Row(
+              children: [
+                GestureDetector(
+                  onTap: widget.onProfileTap,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(20),
+                      border: Border.all(color: Colors.black12),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const CircleAvatar(radius: 10, backgroundColor: Color(0xFFE8DFC8), child: Icon(Icons.person, size: 14, color: Color(0xFF2D5A27))),
+                        const SizedBox(width: 6),
+                        Text(widget.shopName.isEmpty ? 'My Shop' : widget.shopName, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                        const SizedBox(width: 4),
+                        const Icon(Icons.edit, size: 12, color: Colors.black45),
+                      ],
+                    ),
+                  ),
+                ),
+                const Spacer(),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(20),
+                    border: Border.all(color: Colors.black12),
+                  ),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.shopping_bag_outlined, size: 14, color: Color(0xFFD9822B)),
+                      const SizedBox(width: 4),
+                      Text('Orders: ${_cart.length}', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 6),
+                const CircleAvatar(radius: 14, backgroundColor: Color(0xFF2D5A27), child: Icon(Icons.check, size: 14, color: Colors.white)),
+              ],
+            ),
+          ),
+
+          // Scanner Camera Area with Flashlight / Torch
+          Container(
+            height: 180,
+            width: double.infinity,
+            margin: const EdgeInsets.symmetric(horizontal: 14),
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(16),
+              color: Colors.black,
+            ),
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(16),
+              child: Stack(
+                alignment: Alignment.center,
+                children: [
+                  MobileScanner(
+                    controller: _scannerController,
+                    onDetect: _handleBarcodeDetected,
+                  ),
+                  // Green scanning focus rectangle
+                  Container(
+                    width: 200,
+                    height: 100,
+                    decoration: BoxDecoration(
+                      border: Border.all(color: const Color(0xFF86A873), width: 2),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
+                  // Top Overlay with Back & Flashlight Torch
+                  Positioned(
+                    top: 10,
+                    left: 12,
+                    right: 12,
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        const Text('Scan Barcode', style: TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.w600)),
+                        GestureDetector(
+                          onTap: () async {
+                            await _scannerController.toggleTorch();
+                            setState(() => _isTorchOn = !_isTorchOn);
+                          },
+                          child: Container(
+                            padding: const EdgeInsets.all(6),
+                            decoration: BoxDecoration(
+                              color: _isTorchOn ? const Color(0xFFD9822B) : Colors.black45,
+                              shape: BoxShape.circle,
+                            ),
+                            child: Icon(
+                              _isTorchOn ? Icons.flash_on : Icons.flash_off,
+                              color: Colors.white,
+                              size: 18,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+
+ // Action Bar: Active Bill & Loose Item
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                const Text('Active Bill', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Color(0xFF2D5A27))),
+                ElevatedButton.icon(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFFE8DFC8),
+                    foregroundColor: Colors.black87,
+                    elevation: 0,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+                  ),
+                  onPressed: _openLooseItemSelectionModal,
+                  icon: const Icon(Icons.scale, size: 16, color: Color(0xFF2D5A27)),
+                  label: const Text('Loose Item', style: TextStyle(fontWeight: FontWeight.bold)),
+                ),
+              ],
+            ),
+          ),
+
+          // Cart Items List
+          Expanded(
+            child: _cart.isEmpty
+                ? const Center(child: Text('Barcode scan karein ya Loose Item jodein', style: TextStyle(color: Colors.black45)))
+                : ListView.builder(
+                    itemCount: _cart.length,
+                    itemBuilder: (ctx, i) {
+                      final item = _cart[i];
+                      return Container(
+                        margin: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(color: Colors.black12),
+                        ),
+                        child: Row(
+                          children: [
+                            ClipRRect(
+                              borderRadius: BorderRadius.circular(8),
+                              child: Container(
+                                width: 36,
+                                height: 36,
+                                color: const Color(0xFFF3ECE1),
+                                child: item.product.imagePath != null
+                                    ? Image.file(File(item.product.imagePath!), fit: BoxFit.cover)
+                                    : Icon(item.product.isLoose ? Icons.scale : Icons.fastfood, size: 20, color: const Color(0xFF2D5A27)),
+                              ),
+                            ),
+                            const SizedBox(width: 10),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(item.product.name, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+                                  Text(
+                                    '₹${item.unitPrice} x ${item.quantity.toStringAsFixed(item.product.isLoose ? 3 : 0)} ${item.product.isLoose ? 'kg' : 'pc'}',
+                                    style: const TextStyle(color: Colors.black54, fontSize: 12),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            Text('₹${item.total.toStringAsFixed(0)}', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                            const SizedBox(width: 8),
+                            // Pencil Icon for Edit
+                            IconButton(
+                              icon: const Icon(Icons.edit, size: 18, color: Color(0xFF86A873)),
+                              onPressed: () => _openPencilEditModal(item),
+                            ),
+                            // Delete Button
+                            IconButton(
+                              icon: const Icon(Icons.delete_outline, size: 20, color: Color(0xFFD9822B)),
+                              onPressed: () {
+                                setState(() => _cart.removeAt(i));
+                              },
+                            ),
+                          ],
+                        ),
+                      );
+                    },
+                  ),
+          ),
+
+          // Total & Payment Mode Selector
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: const BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+              boxShadow: [BoxShadow(color: Colors.black12, blurRadius: 10, offset: Offset(0, -2))],
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    const Text('Total Bill:', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.black87)),
+                    Text('₹${_totalBill.toStringAsFixed(0)}', style: const TextStyle(fontSize: 26, fontWeight: FontWeight.bold, color: Colors.black)),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                Row(
+                  children: [
+                    Expanded(
+                      child: ElevatedButton(
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFF2D5A27),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+                          padding: const EdgeInsets.symmetric(vertical: 12),
+                        ),
+                        onPressed: () => _finalizeBilling('Online'),
+                        child: const Text('Online', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: ElevatedButton(
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFFD9822B),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+                          padding: const EdgeInsets.symmetric(vertical: 12),
+                        ),
+                        onPressed: () => _finalizeBilling('Cash'),
+                        child: const Text('Cash', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: ElevatedButton(
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFFE8DFC8),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+                          padding: const EdgeInsets.symmetric(vertical: 12),
+                        ),
+                        onPressed: _openUdhaarModal,
+                        child: const Text('Udhaar', style: TextStyle(color: Colors.black87, fontWeight: FontWeight.bold)),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ----------------- SCREEN 3: MY SALES (BAR GRAPH + DEDICATED UDHAAR TAB) -----------------
+
+class MySalesScreen extends StatefulWidget {
+  final String shopName;
+  final List<SaleRecord> sales;
+  final VoidCallback onSalesUpdated;
+
+  const MySalesScreen({
+    super.key,
+    required this.shopName,
+    required this.sales,
+    required this.onSalesUpdated,
+  });
+
+  @override
+  State<MySalesScreen> createState() => _MySalesScreenState();
+}
+
+class _MySalesScreenState extends State<MySalesScreen> with SingleTickerProviderStateMixin {
+  late TabController _tabController;
+  final TextEditingController _udhaarSearchCtrl = TextEditingController();
+  String _udhaarFilterQuery = '';
+
+  @override
+  void initState() {
+    super.initState();
+    _tabController = TabController(length: 2, vsync: this);
+  }
+
+  double get _todaySalesTotal {
+    final now = DateTime.now();
+    final todayStr = "${now.year}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}";
+    return widget.sales
+        .where((s) => s.date == todayStr && s.isPaid)
+        .fold(0.0, (sum, s) => sum + s.totalAmount);
+  }
+
+  void _markUdhaarAsPaid(SaleRecord sale) {
+    setState(() {
+      sale.isPaid = true;
+    });
+    widget.onSalesUpdated();
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text('Udhaar of ₹${sale.totalAmount} cleared for ${sale.customerName}!')),
+    );
+  }
+
+  void _sendWhatsAppReminder(SaleRecord sale) async {
+    final phone = sale.customerPhone ?? '';
+    final buffer = StringBuffer();
+    buffer.writeln("*Namaste ${sale.customerName} Ji!*");
+    buffer.writeln("Aapka *${widget.shopName}* me baaki udhaar hai: *₹${sale.totalAmount}*");
+    buffer.writeln("Tareekh: ${sale.date}");
+    buffer.writeln("Kripya karke dukan aane par bhugtan kar dein.");
+    buffer.writeln("Dhanyawad!");
+
+    final text = Uri.encodeComponent(buffer.toString());
+    final url = phone.isNotEmpty ? "https://wa.me/91$phone?text=$text" : "https://wa.me/?text=$text";
+    final uri = Uri.parse(url);
+    if (await canLaunchUrl(uri)) {
+      await launchUrl(uri, mode: LaunchMode.externalApplication);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final udhaarList = widget.sales.where((s) {
+      final isPendingDebt = s.paymentMode == 'Udhaar' && !s.isPaid;
+      if (!isPendingDebt) return false;
+      if (_udhaarFilterQuery.isEmpty) return true;
+      final q = _udhaarFilterQuery.toLowerCase();
+      final nameMatches = (s.customerName ?? '').toLowerCase().contains(q);
+      final phoneMatches = (s.customerPhone ?? '').toLowerCase().contains(q);
+      return nameMatches || phoneMatches;
+    }).toList();
+
+    return SafeArea(
+      child: Column(
+        children: [
+          // Screen Title
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+            child: Row(
+              children: [
+                const Text('Sales & Khata', style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: Color(0xFF2D5A27))),
+                const Spacer(),
+                Text('Today: ₹${_todaySalesTotal.toStringAsFixed(0)}', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+              ],
+            ),
+          ),
+
+          // Custom Tabs: Sales vs Udhaar
+          Container(
+            margin: const EdgeInsets.symmetric(horizontal: 16),
+            decoration: BoxDecoration(color: const Color(0xFFE8DFC8), borderRadius: BorderRadius.circular(16)),
+            child: TabBar(
+              controller: _tabController,
+              indicator: BoxDecoration(color: const Color(0xFF2D5A27), borderRadius: BorderRadius.circular(16)),
+              labelColor: Colors.white,
+              unselectedLabelColor: Colors.black87,
+              tabs: const [
+                Tab(text: 'My Sales (Graph)'),
+                Tab(text: 'Udhaar Khata'),
+              ],
+            ),
+          ),
+
+          const SizedBox(height: 8),
+
+          // Tab Views
+          Expanded(
+            child: TabBarView(
+              controller: _tabController,
+              children: [
+                // TAB 1: SALES & 5-DAY BAR GRAPH
+                _buildSalesGraphView(),
+
+                // TAB 2: DEDICATED UDHAAR TAB
+                _buildUdhaarKhataView(udhaarList),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSalesGraphView() {
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // 5-Day Sales Bar Chart Simulator
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(16), border: Border.all(color: Colors.black12)),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text('5-Day Sales Overview', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: Colors.black54)),
+                const SizedBox(height: 16),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceAround,
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  children: List.generate(5, (index) {
+                    final dayDate = DateTime.now().subtract(Duration(days: 4 - index));
+                    final dStr = "${dayDate.year}-${dayDate.month.toString().padLeft(2, '0')}-${dayDate.day.toString().padLeft(2, '0')}";
+                    final dayTotal = widget.sales.where((s) => s.date == dStr && s.isPaid).fold(0.0, (sum, s) => sum + s.totalAmount);
+
+                    final barHeight = min(120.0, max(12.0, (dayTotal / 500) * 20));
+                    return Column(
+                      children: [
+                        Text('₹${dayTotal.toStringAsFixed(0)}', style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold)),
+                        const SizedBox(height: 4),
+                        Container(
+                          width: 24,
+                          height: barHeight,
+                          decoration: BoxDecoration(
+                            color: index == 4 ? const Color(0xFFD9822B) : const Color(0xFF2D5A27),
+                            borderRadius: BorderRadius.circular(6),
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Text("${dayDate.day}/${dayDate.month}", style: const TextStyle(fontSize: 11, color: Colors.black54)),
+                      ],
+                    );
+                  }),
+                ),
+              ],
+            ),
+          ),
+
+          const SizedBox(height: 16),
+          const Text('Completed Transactions', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Color(0xFF2D5A27))),
+          const SizedBox(height: 8),
+
+          ...widget.sales.where((s) => s.isPaid).map((sale) => Card(
+                color: Colors.white,
+                elevation: 0,
+                margin: const EdgeInsets.only(bottom: 8),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12), side: const BorderSide(color: Colors.black12)),
+                child: ListTile(
+                  title: Text('₹${sale.totalAmount.toStringAsFixed(0)} - ${sale.paymentMode}', style: const TextStyle(fontWeight: FontWeight.bold)),
+                  subtitle: Text('${sale.date} at ${sale.time} (${sale.itemsSummary.length} items)'),
+                  trailing: const Icon(Icons.check_circle, color: Color(0xFF2D5A27), size: 20),
+                ),
+              )),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildUdhaarKhataView(List<SaleRecord> udhaarList) {
     return Column(
       children: [
-        Stack(
-          alignment: Alignment.center,
-          children: [
-            SizedBox(height: 180, child: MobileScanner(onDetect: _onBarcodeDetected)),
-            Container(
-              width: 220,
-              height: 100,
-              decoration: BoxDecoration(border: Border.all(color: Colors.greenAccent, width: 2), borderRadius: BorderRadius.circular(12)),
-            ),
-          ],
-        ),
+        // Search Box
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              const Text('Active Bill', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Color(0xFF2D5A27))),
-              ElevatedButton.icon(
-                style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFFE8DFC8), foregroundColor: Colors.black87),
-                onPressed: _openLooseItemSelection,
-                icon: const Icon(Icons.scale, size: 18),
-                label: const Text('Loose Item'),
-              ),
-            ],
+          child: TextField(
+            controller: _udhaarSearchCtrl,
+            decoration: InputDecoration(
+              hintText: 'Search name or phone number...',
+              prefixIcon: const Icon(Icons.search, color: Color(0xFF2D5A27)),
+              filled: true,
+              fillColor: Colors.white,
+              contentPadding: const EdgeInsets.symmetric(horizontal: 12),
+              border: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: const BorderSide(color: Colors.black12)),
+            ),
+            onChanged: (val) {
+              setState(() => _udhaarFilterQuery = val.trim());
+            },
           ),
         ),
+
+        // Udhaar Cards List
         Expanded(
-          child: _cart.isEmpty
-              ? const Center(child: Text('Scan items or select loose goods to make bill', style: TextStyle(color: Colors.grey)))
+          child: udhaarList.isEmpty
+              ? const Center(child: Text('Koi Udhaar pending nahi hai! Sab hisab barabar.'))
               : ListView.builder(
-                  itemCount: _cart.length,
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  itemCount: udhaarList.length,
                   itemBuilder: (ctx, i) {
-                    final c = _cart[i];
-                    return ListTile(
-                      title: Text(c.product.name, style: const TextStyle(fontWeight: FontWeight.bold)),
-                      subtitle: Text('₹${c.customPrice} x ${c.quantity} ${c.product.type == ItemType.loose ? "kg" : "pc"}'),
-                      trailing: Row(
-                        mainAxisSize: MainAxisSize.min,
+                    final sale = udhaarList[i];
+                    return Container(
+                      margin: const EdgeInsets.only(bottom: 10),
+                      padding: const EdgeInsets.all(14),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(16),
+                        border: Border.all(color: Colors.red.withOpacity(0.3)),
+                        boxShadow: [
+                          BoxShadow(color: Colors.black.withOpacity(0.03), blurRadius: 6, offset: const Offset(0, 2)),
+                        ],
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text('₹${c.total.toStringAsFixed(0)}', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-                          IconButton(icon: const Icon(Icons.delete_outline, color: Colors.orange), onPressed: () => setState(() => _cart.removeAt(i))),
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Text(
+                                sale.customerName ?? 'Grahak',
+                                style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.black87),
+                              ),
+                              Text(
+                                '₹${sale.totalAmount.toStringAsFixed(0)}',
+                                style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.red),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            'Mobile: ${sale.customerPhone ?? 'N/A'} | Date: ${sale.date} (${sale.time})',
+                            style: const TextStyle(fontSize: 12, color: Colors.black54),
+                          ),
+                          const SizedBox(height: 10),
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.end,
+                            children: [
+                              // WhatsApp Reminder Button
+                              ElevatedButton.icon(
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: const Color(0xFF25D366),
+                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                                ),
+                                icon: const Icon(Icons.send, size: 14, color: Colors.white),
+                                label: const Text('Reminder', style: TextStyle(color: Colors.white, fontSize: 12)),
+                                onPressed: () => _sendWhatsAppReminder(sale),
+                              ),
+                              const SizedBox(width: 8),
+                              // Mark Paid Button
+                              ElevatedButton(
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: const Color(0xFF2D5A27),
+                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+                                ),
+                                onPressed: () => _markUdhaarAsPaid(sale),
+                                child: const Text('Mark Paid', style: TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold)),
+                              ),
+                            ],
+                          ),
                         ],
                       ),
                     );
                   },
                 ),
         ),
-        Container(
-          padding: const EdgeInsets.all(16),
-          decoration: const BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-            boxShadow: [BoxShadow(color: Colors.black12, blurRadius: 4)],
-          ),
-          child: Column(
-            children: [
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  const Text('Total Bill:', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600)),
-                  Text('₹${_currentBillTotal.toStringAsFixed(0)}', style: const TextStyle(fontSize: 26, fontWeight: FontWeight.bold)),
-                ],
-              ),
-              const SizedBox(height: 12),
-              Row(
-                children: [
-                  Expanded(
-                    child: ElevatedButton(
-                      style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF2D5A27), foregroundColor: Colors.white),
-                      onPressed: () => _finalizeTransaction(PaymentMethod.online),
-                      child: const Text('Online'),
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: ElevatedButton(
-                      style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFFD9822B), foregroundColor: Colors.white),
-                      onPressed: () => _finalizeTransaction(PaymentMethod.cash),
-                      child: const Text('Cash'),
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: ElevatedButton(
-                      style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFFE8DFC8), foregroundColor: Colors.black87),
-                      onPressed: () => _finalizeTransaction(PaymentMethod.udhaar),
-                      child: const Text('Udhaar'),
-                    ),
-                  ),
-                ],
-              ),
-            ],
-          ),
-        ),
       ],
     );
   }
 }
-// ==========================================
-// 5. SCREEN: MY SHOP (BARCODE & LOOSE VIEWS)
-// ==========================================
+// ----------------- SCREEN 1: MY SHOP (INVENTORY, LOOSE POTLI, STOCK) -----------------
+
 class MyShopScreen extends StatefulWidget {
+  final String shopName;
   final List<ProductItem> inventory;
-  final Function(ProductItem) onProductUpdated;
-  final Function(String) onProductDeleted;
+  final VoidCallback onInventoryUpdated;
 
   const MyShopScreen({
     super.key,
+    required this.shopName,
     required this.inventory,
-    required this.onProductUpdated,
-    required this.onProductDeleted,
+    required this.onInventoryUpdated,
   });
 
   @override
   State<MyShopScreen> createState() => _MyShopScreenState();
 }
 
-class _MyShopScreenState extends State<MyShopScreen> {
-  int _activeSubTab = 0; // 0: Shop items, 1: Pending
-  bool _isLooseMode = false; // False: Barcode, True: Loose Commodity
+class _MyShopScreenState extends State<MyShopScreen> with SingleTickerProviderStateMixin {
+  late TabController _shopTabController;
   final ImagePicker _picker = ImagePicker();
 
-  Future<void> _pickImageForProduct(ProductItem item, StateSetter setModalState) async {
+  @override
+  void initState() {
+    super.initState();
+    _shopTabController = TabController(length: 2, vsync: this);
+  }
+
+  void _openAddLooseItemModal() async {
+    final nameCtrl = TextEditingController();
+    final purchaseCtrl = TextEditingController();
+    final sellingCtrl = TextEditingController();
+    final stockCtrl = TextEditingController();
+    String? pickedImagePath;
+
     showModalBottomSheet(
       context: context,
-      builder: (ctx) => SafeArea(
-        child: Wrap(
+      isScrollControlled: true,
+      backgroundColor: const Color(0xFFFBF8F2),
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
+      builder: (ctx) {
+        return StatefulBuilder(
+          builder: (modalCtx, setModalState) {
+            return Padding(
+              padding: EdgeInsets.only(
+                bottom: MediaQuery.of(modalCtx).viewInsets.bottom + 16,
+                top: 16,
+                left: 16,
+                right: 16,
+              ),
+              child: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text('Naya Khula Samaan Jodein (Loose Item)', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Color(0xFF2D5A27))),
+                    const SizedBox(height: 12),
+                    Center(
+                      child: GestureDetector(
+                        onTap: () async {
+                          final XFile? img = await _picker.pickImage(source: ImageSource.camera);
+                          if (img != null) {
+                            setModalState(() => pickedImagePath = img.path);
+                          }
+                        },
+                        child: Container(
+                          width: 80,
+                          height: 80,
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(16),
+                            border: Border.all(color: const Color(0xFF2D5A27)),
+                          ),
+                          child: pickedImagePath != null
+                              ? ClipRRect(borderRadius: BorderRadius.circular(16), child: Image.file(File(pickedImagePath!), fit: BoxFit.cover))
+                              : const Column(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    Icon(Icons.camera_alt, color: Color(0xFF2D5A27)),
+                                    Text('Photo lein', style: TextStyle(fontSize: 10, color: Colors.black54)),
+                                  ],
+                                ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    TextField(controller: nameCtrl, decoration: const InputDecoration(labelText: 'Item Name (e.g. Desi Chana)')),
+                    const SizedBox(height: 8),
+                    Row(
+                      children: [
+                        Expanded(child: TextField(controller: purchaseCtrl, keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: 'Khareed Rate /kg'))),
+                        const SizedBox(width: 8),
+                        Expanded(child: TextField(controller: sellingCtrl, keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: 'Bikri Rate /kg'))),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                    TextField(controller: stockCtrl, keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: 'Kul Wajan (Stock in Kg)')),
+                    const SizedBox(height: 16),
+                    SizedBox(
+                      width: double.infinity,
+                      height: 48,
+                      child: ElevatedButton(
+                        style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF2D5A27)),
+                        onPressed: () {
+                          if (nameCtrl.text.trim().isNotEmpty) {
+                            final newItem = ProductItem(
+                              barcode: 'LOOSE_${DateTime.now().millisecondsSinceEpoch}',
+                              name: nameCtrl.text.trim(),
+                              purchasePrice: double.tryParse(purchaseCtrl.text.trim()) ?? 0.0,
+                              sellingPrice: double.tryParse(sellingCtrl.text.trim()) ?? 0.0,
+                              stock: double.tryParse(stockCtrl.text.trim()) ?? 0.0,
+                              imagePath: pickedImagePath,
+                              isLoose: true,
+                            );
+                            widget.inventory.add(newItem);
+                            widget.onInventoryUpdated();
+                            Navigator.pop(modalCtx);
+                            setState(() {});
+                          }
+                        },
+                        child: const Text('Save Loose Item', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+void _openStockBarcodeScanner() {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      builder: (ctx) => SizedBox(
+        height: 380,
+        child: Column(
           children: [
-            ListTile(
-              leading: const Icon(Icons.camera_alt),
-              title: const Text('Take Photo with Camera'),
-              onTap: () async {
-                Navigator.pop(ctx);
-                final picked = await _picker.pickImage(source: ImageSource.camera, maxWidth: 600);
-                if (picked != null) {
-                  setModalState(() => item.imagePath = picked.path);
-                }
-              },
+            Container(
+              padding: const EdgeInsets.all(12),
+              color: const Color(0xFF2D5A27),
+              child: const Row(
+                children: [
+                  Icon(Icons.qr_code_scanner, color: Colors.white),
+                  SizedBox(width: 8),
+                  Text('Maal Barcode Scan Karein (Stock Update)', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                ],
+              ),
             ),
-            ListTile(
-              leading: const Icon(Icons.photo_library),
-              title: const Text('Choose from Gallery'),
-              onTap: () async {
-                Navigator.pop(ctx);
-                final picked = await _picker.pickImage(source: ImageSource.gallery, maxWidth: 600);
-                if (picked != null) {
-                  setModalState(() => item.imagePath = picked.path);
-                }
-              },
+            Expanded(
+              child: MobileScanner(
+                onDetect: (capture) {
+                  final code = capture.barcodes.firstOrNull?.rawValue;
+                  if (code != null && code.trim().isNotEmpty) {
+                    Navigator.pop(ctx);
+                    _openStockUpdateDetailModal(code);
+                  }
+                },
+              ),
             ),
           ],
         ),
@@ -1016,580 +1738,198 @@ class _MyShopScreenState extends State<MyShopScreen> {
     );
   }
 
-  // Exact Vanik Stock & Edit Modal (Screenshot 43)
-  void _openExactVanikModal(ProductItem item, {bool isNew = false}) {
-    final nameCtrl = TextEditingController(text: item.name);
-    final buyCtrl = TextEditingController(text: item.buyingPrice > 0 ? item.buyingPrice.toStringAsFixed(0) : '');
-    final sellCtrl = TextEditingController(text: item.sellingPrice > 0 ? item.sellingPrice.toStringAsFixed(0) : '');
-    final stockCtrl = TextEditingController(text: item.stock > 0 ? item.stock.toStringAsFixed(0) : '');
-
-    final isLoose = item.type == ItemType.loose;
+  void _openStockUpdateDetailModal(String barcode) {
+    final existingIndex = widget.inventory.indexWhere((p) => p.barcode == barcode);
+    final nameCtrl = TextEditingController(text: existingIndex != -1 ? widget.inventory[existingIndex].name : '');
+    final sellCtrl = TextEditingController(text: existingIndex != -1 ? widget.inventory[existingIndex].sellingPrice.toString() : '');
+    final buyCtrl = TextEditingController(text: existingIndex != -1 ? widget.inventory[existingIndex].purchasePrice.toString() : '');
+    final addStockCtrl = TextEditingController(text: '10');
 
     showDialog(
       context: context,
-      builder: (ctx) => StatefulBuilder(
-        builder: (context, setModalState) => AlertDialog(
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
-          contentPadding: const EdgeInsets.all(20),
-          content: SingleChildScrollView(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Stack(
-                      alignment: Alignment.center,
-                      children: [
-                        Container(
-                          width: 88,
-                          height: 88,
-                          decoration: BoxDecoration(
-                            color: const Color(0xFFF4F1EA),
-                            borderRadius: BorderRadius.circular(16),
-                            border: Border.all(color: const Color(0xFFECE7DC)),
-                            image: item.imagePath.isNotEmpty
-                                ? DecorationImage(image: FileImage(File(item.imagePath)), fit: BoxFit.cover)
-                                : null,
-                          ),
-                          child: item.imagePath.isEmpty
-                              ? const Icon(Icons.inventory_2_outlined, size: 36, color: Color(0xFF2D5A27))
-                              : null,
-                        ),
-                        Positioned(
-                          bottom: 4,
-                          left: 4,
-                          child: InkWell(
-                            onTap: () => _pickImageForProduct(item, setModalState),
-                            child: Container(
-                              padding: const EdgeInsets.all(6),
-                              decoration: const BoxDecoration(
-                                color: Colors.white,
-                                shape: BoxShape.circle,
-                                boxShadow: [BoxShadow(color: Colors.black26, blurRadius: 4)],
-                              ),
-                              child: const Icon(Icons.camera_alt, size: 16, color: Colors.black87),
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(width: 14),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.end,
-                        children: [
-                          Text(
-                            item.barcode.length > 12 ? item.barcode.substring(0, 11) : item.barcode,
-                            style: const TextStyle(color: Colors.grey, fontSize: 13),
-                          ),
-                          const SizedBox(height: 6),
-                          Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                            decoration: BoxDecoration(
-                              color: const Color(0xFFF4F1EA),
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.center,
-                              children: [
-                                const Text('Product name', style: TextStyle(color: Color(0xFF9E8A68), fontSize: 12, fontWeight: FontWeight.bold)),
-                                TextField(
-                                  controller: nameCtrl,
-                                  textAlign: TextAlign.center,
-                                  decoration: const InputDecoration(border: InputBorder.none, isDense: true, contentPadding: EdgeInsets.symmetric(vertical: 4)),
-                                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 18),
-                _buildInputRow(
-                  label: isLoose ? 'Buying price of 1 Kg' : 'Buying price of 1 Piece',
-                  controller: buyCtrl,
-                ),
-                const SizedBox(height: 10),
-                _buildInputRow(
-                  label: isLoose ? 'Your selling price of 1 Kg' : 'Your selling price of 1 Piece',
-                  controller: sellCtrl,
-                ),
-                const SizedBox(height: 10),
-                _buildInputRow(
-                  label: isLoose ? 'Current kilos in shop' : 'Current pieces in shop',
-                  controller: stockCtrl,
-                ),
-                const SizedBox(height: 22),
-                Row(
-                  children: [
-                    if (!isNew)
-                      InkWell(
-                        onTap: () {
-                          widget.onProductDeleted(item.barcode);
-                          Navigator.pop(ctx);
-                        },
-                        child: Container(
-                          padding: const EdgeInsets.all(12),
-                          decoration: BoxDecoration(
-                            border: Border.all(color: Colors.grey.shade300),
-                            borderRadius: BorderRadius.circular(14),
-                          ),
-                          child: const Icon(Icons.delete_outline, color: Colors.grey, size: 24),
-                        ),
-                      ),
-                    if (!isNew) const SizedBox(width: 12),
-                    Expanded(
-                      child: ElevatedButton(
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: const Color(0xFFD9822B),
-                          foregroundColor: Colors.white,
-                          minimumSize: const Size(double.infinity, 50),
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-                        ),
-                        onPressed: () {
-                          item.name = nameCtrl.text.trim().isNotEmpty ? nameCtrl.text.trim() : (isLoose ? 'Loose Commodity' : 'Item ${item.barcode}');
-                          item.buyingPrice = double.tryParse(buyCtrl.text) ?? 0.0;
-                          item.sellingPrice = double.tryParse(sellCtrl.text) ?? 0.0;
-                          item.stock = double.tryParse(stockCtrl.text) ?? 0.0;
-                          item.isPending = false;
-                          widget.onProductUpdated(item);
-                          Navigator.pop(ctx);
-                        },
-                        child: Text(isNew ? 'Save' : 'Update', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-                      ),
-                    ),
-                  ],
-                ),
-              ],
-            ),
-          ),
+      builder: (ctx) => AlertDialog(
+        backgroundColor: const Color(0xFFFBF8F2),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: Text(existingIndex != -1 ? 'Stock Badhayein' : 'Naya Packet Item', style: const TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF2D5A27))),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextField(controller: nameCtrl, decoration: const InputDecoration(labelText: 'Product Name')),
+            TextField(controller: buyCtrl, keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: 'Khareed Rate (₹)')),
+            TextField(controller: sellCtrl, keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: 'Bikri Rate (₹)')),
+            TextField(controller: addStockCtrl, keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: 'Kitna Piece Add Karna Hai?')),
+          ],
         ),
-      ),
-    );
-  }
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFFD9822B)),
+            onPressed: () {
+              final added = double.tryParse(addStockCtrl.text.trim()) ?? 0.0;
+              final sell = double.tryParse(sellCtrl.text.trim()) ?? 0.0;
+              final buy = double.tryParse(buyCtrl.text.trim()) ?? 0.0;
 
-  Widget _buildInputRow({required String label, required TextEditingController controller}) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: const Color(0xFFECE7DC)),
-      ),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          Expanded(child: Text(label, style: const TextStyle(color: Colors.grey, fontSize: 14))),
-          SizedBox(
-            width: 70,
-            child: TextField(
-              controller: controller,
-              textAlign: TextAlign.center,
-              keyboardType: const TextInputType.numberWithOptions(decimal: true),
-              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
-              decoration: const InputDecoration(border: InputBorder.none, isDense: true),
-            ),
+              if (existingIndex != -1) {
+                widget.inventory[existingIndex].stock += added;
+                widget.inventory[existingIndex].sellingPrice = sell;
+                widget.inventory[existingIndex].purchasePrice = buy;
+                widget.inventory[existingIndex].isPending = false;
+              } else {
+                widget.inventory.add(ProductItem(
+                  barcode: barcode,
+                  name: nameCtrl.text.trim().isEmpty ? 'Item $barcode' : nameCtrl.text.trim(),
+                  sellingPrice: sell,
+                  purchasePrice: buy,
+                  stock: added,
+                  isLoose: false,
+                  isPending: false,
+                ));
+              }
+              widget.onInventoryUpdated();
+              setState(() {});
+              Navigator.pop(ctx);
+            },
+            child: const Text('Save Stock', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
           ),
         ],
       ),
     );
   }
 
-  void _openBarcodeStockFlow() {
-    showDialog(
-      context: context,
-      builder: (ctx) => Dialog(
-        child: SizedBox(
-          height: 300,
-          child: Column(
-            children: [
-              const Padding(padding: EdgeInsets.all(8), child: Text('Scan Barcode to Stock', style: TextStyle(fontWeight: FontWeight.bold))),
-              Expanded(
-                child: MobileScanner(
-                  onDetect: (capture) {
-                    for (final b in capture.barcodes) {
-                      if (b.rawValue != null && b.rawValue!.isNotEmpty) {
-                        Navigator.pop(ctx);
-                        final existing = widget.inventory.where((p) => p.barcode == b.rawValue!).toList();
-                        if (existing.isNotEmpty) {
-                          _openExactVanikModal(existing.first);
-                        } else {
-                          final newItem = ProductItem(
-                            id: 'item_${DateTime.now().millisecondsSinceEpoch}',
-                            name: '',
-                            barcode: b.rawValue!,
-                            sellingPrice: 0.0,
-                            buyingPrice: 0.0,
-                            stock: 0.0,
-                            type: ItemType.piece,
-                          );
-                          _openExactVanikModal(newItem, isNew: true);
-                        }
-                        break;
-                      }
-                    }
-                  },
+  @override
+  Widget build(BuildContext context) {
+    final confirmedInventory = widget.inventory.where((p) => !p.isPending).toList();
+    final pendingCatalog = widget.inventory.where((p) => p.isPending).toList();
+
+    return SafeArea(
+      child: Column(
+        children: [
+          // Header
+          Padding(
+            padding: const EdgeInsets.all(16.0),
+            child: Row(
+              children: [
+                Text(widget.shopName.isEmpty ? 'My Shop' : widget.shopName, style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: Color(0xFF2D5A27))),
+                const Spacer(),
+                // Add Loose Item Button
+                ElevatedButton.icon(
+                  style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFFE8DFC8), elevation: 0),
+                  onPressed: _openAddLooseItemModal,
+                  icon: const Icon(Icons.scale, color: Color(0xFF2D5A27), size: 16),
+                  label: const Text('Khula Maal', style: TextStyle(color: Color(0xFF2D5A27), fontWeight: FontWeight.bold)),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
-        ),
+
+          // Big Mustard Stock Scanner Button
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16.0),
+            child: SizedBox(
+              width: double.infinity,
+              height: 48,
+              child: ElevatedButton.icon(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFFD9822B),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                ),
+                onPressed: _openStockBarcodeScanner,
+                icon: const Icon(Icons.qr_code_scanner, color: Colors.white),
+                label: const Text('Stock Barcode Scan Karein', style: TextStyle(color: Colors.white, fontSize: 15, fontWeight: FontWeight.bold)),
+              ),
+            ),
+          ),
+
+          const SizedBox(height: 12),
+
+          // Tabs: Main Inventory vs Pending Catalog
+          Container(
+            margin: const EdgeInsets.symmetric(horizontal: 16),
+            decoration: BoxDecoration(color: const Color(0xFFE8DFC8), borderRadius: BorderRadius.circular(12)),
+            child: TabBar(
+              controller: _shopTabController,
+              indicator: BoxDecoration(color: const Color(0xFF2D5A27), borderRadius: BorderRadius.circular(12)),
+              labelColor: Colors.white,
+              unselectedLabelColor: Colors.black87,
+              tabs: [
+                Tab(text: 'Dukaan Stock (${confirmedInventory.length})'),
+                Tab(text: 'Pending (${pendingCatalog.length})'),
+              ],
+            ),
+          ),
+
+          const SizedBox(height: 8),
+
+          Expanded(
+            child: TabBarView(
+              controller: _shopTabController,
+              children: [
+                // Confirmed Inventory List
+                confirmedInventory.isEmpty
+                    ? const Center(child: Text('Dukaan me koi item nahi hai. Stock jodein!'))
+                    : ListView.builder(
+                        padding: const EdgeInsets.all(16),
+                        itemCount: confirmedInventory.length,
+                        itemBuilder: (ctx, i) {
+                          final item = confirmedInventory[i];
+                          return Card(
+                            color: Colors.white,
+                            elevation: 0,
+                            margin: const EdgeInsets.only(bottom: 8),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12), side: const BorderSide(color: Colors.black12)),
+                            child: ListTile(
+                              leading: ClipRRect(
+                                borderRadius: BorderRadius.circular(8),
+                                child: Container(
+                                  width: 40,
+                                  height: 40,
+                                  color: const Color(0xFFF3ECE1),
+                                  child: item.imagePath != null
+                                      ? Image.file(File(item.imagePath!), fit: BoxFit.cover)
+                                      : Icon(item.isLoose ? Icons.scale : Icons.inventory_2, color: const Color(0xFF2D5A27)),
+                                ),
+                              ),
+                              title: Text(item.name, style: const TextStyle(fontWeight: FontWeight.bold)),
+                              subtitle: Text('Bikri: ₹${item.sellingPrice} | Stock: ${item.stock.toStringAsFixed(item.isLoose ? 2 : 0)} ${item.isLoose ? 'kg' : 'pcs'}'),
+                              trailing: IconButton(
+                                icon: const Icon(Icons.edit, color: Color(0xFFD9822B)),
+                                onPressed: () => _openStockUpdateDetailModal(item.barcode),
+                              ),
+                            ),
+                          );
+                        },
+                      ),
+
+                // Pending Unconfigured Catalog
+                pendingCatalog.isEmpty
+                    ? const Center(child: Text('Koi pending item nahi hai.'))
+                    : ListView.builder(
+                        padding: const EdgeInsets.all(16),
+                        itemCount: pendingCatalog.length,
+                        itemBuilder: (ctx, i) {
+                          final item = pendingCatalog[i];
+                          return Card(
+                            color: Colors.white,
+                            elevation: 0,
+                            margin: const EdgeInsets.only(bottom: 8),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12), side: const BorderSide(color: Colors.orangeAccent)),
+                            child: ListTile(
+                              title: Text(item.name, style: const TextStyle(fontWeight: FontWeight.bold)),
+                              subtitle: Text('Selling: ₹${item.sellingPrice} | Khareed rate bharna baaki hai'),
+                              trailing: ElevatedButton(
+                                style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFFD9822B)),
+                                onPressed: () => _openStockUpdateDetailModal(item.barcode),
+                                child: const Text('Complete', style: TextStyle(color: Colors.white, fontSize: 12)),
+                              ),
+                            ),
+                          );
+                        },
+                      ),
+              ],
+            ),
+          ),
+        ],
       ),
     );
   }
-
-  void _openLooseStockFlow() {
-    final newItem = ProductItem(
-      id: 'loose_${DateTime.now().millisecondsSinceEpoch}',
-      name: '',
-      barcode: 'L_${DateTime.now().millisecondsSinceEpoch}',
-      sellingPrice: 0.0,
-      buyingPrice: 0.0,
-      stock: 0.0,
-      type: ItemType.loose,
-    );
-    _openExactVanikModal(newItem, isNew: true);
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final filteredByType = widget.inventory.where((p) => _isLooseMode ? p.type == ItemType.loose : p.type == ItemType.piece).toList();
-    final pendingList = filteredByType.where((p) => p.isPending).toList();
-    final activeList = _activeSubTab == 0 ? filteredByType : pendingList;
-
-    return Column(
-      children: [
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
-          child: Row(
-            children: [
-              Expanded(
-                child: InkWell(
-                  onTap: () => setState(() => _activeSubTab = 0),
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(vertical: 10),
-                    decoration: BoxDecoration(
-                      color: _activeSubTab == 0 ? const Color(0xFFD8CBB5) : Colors.white,
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(color: const Color(0xFFD8CBB5)),
-                    ),
-                    child: Center(
-                      child: Text('Shop items: ${filteredByType.length}', style: TextStyle(fontWeight: FontWeight.bold, color: _activeSubTab == 0 ? const Color(0xFF4A3E2C) : Colors.black87)),
-                    ),
-                  ),
-                ),
-              ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: InkWell(
-                  onTap: () => setState(() => _activeSubTab = 1),
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(vertical: 10),
-                    decoration: BoxDecoration(
-                      color: _activeSubTab == 1 ? const Color(0xFFD8CBB5) : Colors.white,
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(color: const Color(0xFFD8CBB5)),
-                    ),
-                    child: Center(
-                      child: Text('Pending: ${pendingList.length}', style: TextStyle(fontWeight: FontWeight.bold, color: _activeSubTab == 1 ? const Color(0xFF4A3E2C) : Colors.black87)),
-                    ),
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ),
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
-          child: Row(
-            children: [
-              Expanded(
-                child: Container(
-                  height: 44,
-                  padding: const EdgeInsets.symmetric(horizontal: 12),
-                  decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(12), border: Border.all(color: const Color(0xFFE8DFC8))),
-                  child: Row(
-                    children: [
-                      const Icon(Icons.search, color: Colors.grey),
-                      const SizedBox(width: 8),
-                      Text(_isLooseMode ? 'Search loose item' : 'Search barcode item', style: const TextStyle(color: Colors.grey, fontSize: 14)),
-                    ],
-                  ),
-                ),
-              ),
-              const SizedBox(width: 8),
-              InkWell(
-                onTap: () => setState(() => _isLooseMode = false),
-                child: Container(
-                  height: 44,
-                  width: 44,
-                  decoration: BoxDecoration(
-                    color: !_isLooseMode ? const Color(0xFFE8DFC8) : Colors.white,
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: const Color(0xFFE8DFC8)),
-                  ),
-                  child: const Icon(Icons.qr_code_scanner, color: Color(0xFF2D5A27)),
-                ),
-              ),
-              const SizedBox(width: 8),
-              InkWell(
-                onTap: () => setState(() => _isLooseMode = true),
-                child: Container(
-                  height: 44,
-                  width: 44,
-                  decoration: BoxDecoration(
-                    color: _isLooseMode ? const Color(0xFFE8DFC8) : Colors.white,
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: const Color(0xFFE8DFC8)),
-                  ),
-                  child: const Icon(Icons.scale, color: Color(0xFF2D5A27)),
-                ),
-              ),
-            ],
-          ),
-        ),
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-          child: SizedBox(
-            width: double.infinity,
-            height: 46,
-            child: ElevatedButton.icon(
-              style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFFD9822B),
-                foregroundColor: Colors.white,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-              ),
-              onPressed: _isLooseMode ? _openLooseStockFlow : _openBarcodeStockFlow,
-              icon: Icon(_isLooseMode ? Icons.scale : Icons.qr_code, size: 20),
-              label: Text(_isLooseMode ? 'Stock loose item' : 'Stock barcode items', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
-            ),
-          ),
-        ),
-        const SizedBox(height: 4),
-        Expanded(
-          child: activeList.isEmpty
-              ? Center(
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Icon(_isLooseMode ? Icons.scale_outlined : Icons.storefront_outlined, size: 64, color: Colors.grey.shade400),
-                      const SizedBox(height: 8),
-                      Text(_isLooseMode ? 'Dukaan me koi loose item nahi hai' : 'Dukaan me abhi koi barcode samaan nahi hai', style: const TextStyle(color: Colors.grey, fontWeight: FontWeight.bold)),
-                      Text('Upar diye button se ${_isLooseMode ? "loose item" : "barcode maal"} jodein', style: const TextStyle(color: Colors.grey, fontSize: 12)),
-                    ],
-                  ),
-                )
-              : ListView.builder(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-                  itemCount: activeList.length,
-                  itemBuilder: (ctx, i) {
-                    final it = activeList[i];
-                    return InkWell(
-                      onTap: () => _openExactVanikModal(it),
-                      borderRadius: BorderRadius.circular(14),
-                      child: Container(
-                        margin: const EdgeInsets.only(bottom: 8),
-                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                        decoration: BoxDecoration(
-                          color: Colors.white,
-                          borderRadius: BorderRadius.circular(14),
-                          border: Border.all(color: const Color(0xFFECE7DC)),
-                        ),
-                        child: Row(
-                          children: [
-                            Container(
-                              width: 50,
-                              height: 50,
-                              decoration: BoxDecoration(
-                                color: const Color(0xFFF4F1EA),
-                                borderRadius: BorderRadius.circular(10),
-                                image: it.imagePath.isNotEmpty ? DecorationImage(image: FileImage(File(it.imagePath)), fit: BoxFit.cover) : null,
-                              ),
-                              child: it.imagePath.isEmpty
-                                  ? Icon(it.type == ItemType.loose ? Icons.scale : Icons.inventory_2, color: const Color(0xFF2D5A27))
-                                  : null,
-                            ),
-                            const SizedBox(width: 12),
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(it.name, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
-                                  const SizedBox(height: 4),
-                                  Text(
-                                    '${it.stock.toStringAsFixed(0)} ${it.type == ItemType.loose ? "kilo" : "piece"}',
-                                    style: TextStyle(color: it.stock < 5 ? Colors.red : Colors.grey.shade600, fontSize: 13),
-                                  ),
-                                ],
-                              ),
-                            ),
-                            Text(
-                              it.type == ItemType.loose ? '₹${it.sellingPrice.toStringAsFixed(0)}/kg' : '₹${it.sellingPrice.toStringAsFixed(0)}',
-                              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
-                            ),
-                            const SizedBox(width: 6),
-                            const Icon(Icons.edit_outlined, size: 20, color: Color(0xFF2D5A27)),
-                          ],
-                        ),
-                      ),
-                    );
-                  },
-                ),
-        ),
-      ],
-    );
-  }
-}
-// ==========================================
-// 6. SCREEN: MY SALES (VANIK DAILY BAR CHART)
-// ==========================================
-class MySalesScreen extends StatelessWidget {
-  final List<SaleRecord> sales;
-  final String shopName;
-  final Function(String) onUdhaarCleared;
-
-  const MySalesScreen({
-    super.key,
-    required this.sales,
-    required this.shopName,
-    required this.onUdhaarCleared,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final now = DateTime.now();
-    final todaySales = sales.where((s) => s.date.day == now.day && s.date.month == now.month && s.date.year == now.year).toList();
-    final todayTotal = todaySales.fold(0.0, (sum, r) => sum + r.total);
-
-    return Column(
-      children: [
-        Container(
-          margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-          padding: const EdgeInsets.all(16),
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: const Color(0xFFECE7DC)),
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Text('Sales of day', style: TextStyle(color: Colors.grey, fontSize: 13)),
-                      const SizedBox(height: 2),
-                      Text('₹${todayTotal.toStringAsFixed(0)}', style: const TextStyle(fontSize: 26, fontWeight: FontWeight.bold)),
-                    ],
-                  ),
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                    decoration: BoxDecoration(color: const Color(0xFFF4F1EA), borderRadius: BorderRadius.circular(10)),
-                    child: Text(DateFormat('MMMM yyyy').format(now), style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 18),
-              SizedBox(
-                height: 100,
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceAround,
-                  crossAxisAlignment: CrossAxisAlignment.end,
-                  children: List.generate(5, (idx) {
-                    final targetDate = now.subtract(Duration(days: 4 - idx));
-                    final dayTotal = sales
-                        .where((s) => s.date.day == targetDate.day && s.date.month == targetDate.month && s.date.year == targetDate.year)
-                        .fold(0.0, (sum, r) => sum + r.total);
-                    final double barHeight = ((dayTotal > 0 ? (dayTotal / 500.0) * 60 : 6).clamp(6.0, 70.0)).toDouble();
-
-                    return Column(
-                      mainAxisAlignment: MainAxisAlignment.end,
-                      children: [
-                        Text('₹${dayTotal.toStringAsFixed(0)}', style: const TextStyle(fontSize: 10, color: Colors.grey)),
-                        const SizedBox(height: 4),
-                        Container(
-                          width: 22,
-                          height: barHeight,
-                          decoration: BoxDecoration(
-                            color: idx == 4 ? const Color(0xFF7FA06B) : const Color(0xFFD8CBB5),
-                            borderRadius: BorderRadius.circular(6),
-                          ),
-                        ),
-                        const SizedBox(height: 6),
-                        Text(
-                          idx == 4 ? 'Today' : '${targetDate.day} ${DateFormat('MMM').format(targetDate)}',
-                          style: TextStyle(fontSize: 10, fontWeight: idx == 4 ? FontWeight.bold : FontWeight.normal),
-                        ),
-                      ],
-                    );
-                  }),
-                ),
-              ),
-            ],
-          ),
-        ),
-        const Padding(
-          padding: EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-          child: Align(
-            alignment: Alignment.centerLeft,
-            child: Text('Bills of the day', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: Color(0xFF2D5A27))),
-          ),
-        ),
-       Expanded(
-          child: todaySales.isEmpty
-              ? const Center(child: Text('No bills created today yet', style: TextStyle(color: Colors.grey)))
-              : ListView.builder(
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-                  itemCount: todaySales.length,
-                  itemBuilder: (ctx, i) {
-                    final s = todaySales[i];
-                    return Container(
-                      margin: const EdgeInsets.only(bottom: 8),
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(12),
-                        border: Border.all(color: const Color(0xFFECE7DC)),
-                      ),
-                      child: ListTile(
-                        leading: Icon(
-                          s.method == PaymentMethod.online ? Icons.qr_code : (s.method == PaymentMethod.cash ? Icons.money : Icons.account_balance_wallet),
-                          color: const Color(0xFF2D5A27),
-                        ),
-                        title: Text('₹${s.total.toStringAsFixed(0)} (${s.method.name.toUpperCase()})', style: const TextStyle(fontWeight: FontWeight.bold)),
-                        subtitle: Text('${DateFormat('hh:mm a').format(s.date)} ${s.customerPhone.isNotEmpty ? "| Mobile: ${s.customerPhone}" : ""}'),
-                        trailing: s.method == PaymentMethod.udhaar
-                            ? Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  if (s.customerPhone.isNotEmpty)
-                                    IconButton(
-                                      icon: const Icon(Icons.share, color: Colors.green, size: 20),
-                                      onPressed: () {
-                                        final reminder = "Namaste! $shopName se aapka ₹${s.total.toStringAsFixed(0)} ka udhaar baaki hai. Kripya samay par chukta karein.";
-                                        launchUrl(Uri.parse("https://wa.me/91${s.customerPhone}?text=${Uri.encodeComponent(reminder)}"));
-                                      },
-                                    ),
-                                  ElevatedButton(
-                                    style: ElevatedButton.styleFrom(backgroundColor: s.isPaid ? Colors.green : Colors.red, foregroundColor: Colors.white),
-                                    onPressed: s.isPaid ? null : () => onUdhaarCleared(s.id),
-                                    child: Text(s.isPaid ? 'PAID' : 'COLLECT'),
-                                  ),
-                                ],
-                              )
-                            : null,
-                      ),
-                    );
-                  },
-                ),
-        ),
-      ],
-    );
-  }
-} 
+  
