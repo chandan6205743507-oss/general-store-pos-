@@ -1551,17 +1551,13 @@ class MyShopScreen extends StatefulWidget {
   State<MyShopScreen> createState() => _MyShopScreenState();
 }
 
-class _MyShopScreenState extends State<MyShopScreen> with SingleTickerProviderStateMixin {
-  late TabController _shopTabController;
+class _MyShopScreenState extends State<MyShopScreen> {
+  int _selectedTab = 0; // 0: Shop items, 1: Pending
+  final TextEditingController _searchCtrl = TextEditingController();
+  String _searchQuery = '';
   final ImagePicker _picker = ImagePicker();
 
-  @override
-  void initState() {
-    super.initState();
-    _shopTabController = TabController(length: 2, vsync: this);
-  }
-
-  void _openAddLooseItemModal() async {
+  void _openAddLooseItemModal() {
     final nameCtrl = TextEditingController();
     final purchaseCtrl = TextEditingController();
     final sellingCtrl = TextEditingController();
@@ -1588,7 +1584,7 @@ class _MyShopScreenState extends State<MyShopScreen> with SingleTickerProviderSt
                   mainAxisSize: MainAxisSize.min,
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Text('Naya Khula Samaan Jodein (Loose Item)', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Color(0xFF2D5A27))),
+                    const Text('Khula Samaan Jodein (Loose Item)', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Color(0xFF2D5A27))),
                     const SizedBox(height: 12),
                     Center(
                       child: GestureDetector(
@@ -1619,7 +1615,7 @@ class _MyShopScreenState extends State<MyShopScreen> with SingleTickerProviderSt
                       ),
                     ),
                     const SizedBox(height: 12),
-                    TextField(controller: nameCtrl, decoration: const InputDecoration(labelText: 'Item Name (e.g. Desi Chana)')),
+                    TextField(controller: nameCtrl, decoration: const InputDecoration(labelText: 'Item Name (e.g. Desi Chana, Loose Biscuit)')),
                     const SizedBox(height: 8),
                     Row(
                       children: [
@@ -1806,120 +1802,253 @@ class _MyShopScreenState extends State<MyShopScreen> with SingleTickerProviderSt
     final confirmedInventory = widget.inventory.where((p) => !p.isPending).toList();
     final pendingCatalog = widget.inventory.where((p) => p.isPending).toList();
 
+    final currentList = (_selectedTab == 0 ? confirmedInventory : pendingCatalog).where((item) {
+      if (_searchQuery.isEmpty) return true;
+      return item.name.toLowerCase().contains(_searchQuery.toLowerCase()) ||
+          item.barcode.toLowerCase().contains(_searchQuery.toLowerCase());
+    }).toList();
+
     return SafeArea(
       child: Column(
         children: [
+          // 1. Top Header Row (Damodar Mahto General Store | Orders | Check)
           Padding(
-            padding: const EdgeInsets.all(16.0),
+            padding: const EdgeInsets.symmetric(horizontal: 14.0, vertical: 8.0),
             child: Row(
               children: [
-                Text(widget.shopName.isEmpty ? 'My Shop' : widget.shopName, style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: Color(0xFF2D5A27))),
-                const Spacer(),
-                ElevatedButton.icon(
-                  style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFFE8DFC8), elevation: 0),
-                  onPressed: _openAddLooseItemModal,
-                  icon: const Icon(Icons.scale, color: Color(0xFF2D5A27), size: 16),
-                  label: const Text('Khula Maal', style: TextStyle(color: Color(0xFF2D5A27), fontWeight: FontWeight.bold)),
+                Expanded(
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(20),
+                      border: Border.all(color: Colors.black12),
+                    ),
+                    child: Row(
+                      children: [
+                        const CircleAvatar(radius: 10, backgroundColor: Color(0xFFE8DFC8), child: Icon(Icons.person, size: 14, color: Color(0xFF2D5A27))),
+                        const SizedBox(width: 6),
+                        Expanded(
+                          child: Text(
+                            widget.shopName.isEmpty ? 'My Shop' : widget.shopName,
+                            style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                        const Icon(Icons.edit, size: 12, color: Colors.black45),
+                      ],
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(20),
+                    border: Border.all(color: Colors.black12),
+                  ),
+                  child: const Row(
+                    children: [
+                      Icon(Icons.shopping_bag_outlined, size: 14, color: Color(0xFFD9822B)),
+                      SizedBox(width: 4),
+                      Text('Orders: 0', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 6),
+                const CircleAvatar(radius: 14, backgroundColor: Color(0xFF2D5A27), child: Icon(Icons.check, size: 14, color: Colors.white)),
+              ],
+            ),
+          ),
+
+          // 2. Tabs Row: Shop items vs Pending
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 14.0, vertical: 4.0),
+            child: Row(
+              children: [
+                Expanded(
+                  child: GestureDetector(
+                    onTap: () => setState(() => _selectedTab = 0),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(vertical: 10),
+                      decoration: BoxDecoration(
+                        color: _selectedTab == 0 ? const Color(0xFFE8DFC8) : Colors.white,
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: Colors.black12),
+                      ),
+                      alignment: Alignment.center,
+                      child: Text(
+                        'Shop items: ${confirmedInventory.length}',
+                        style: TextStyle(
+                          fontWeight: FontWeight.bold,
+                          color: _selectedTab == 0 ? Colors.black87 : Colors.black54,
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: GestureDetector(
+                    onTap: () => setState(() => _selectedTab = 1),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(vertical: 10),
+                      decoration: BoxDecoration(
+                        color: _selectedTab == 1 ? const Color(0xFFE8DFC8) : Colors.white,
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: Colors.black12),
+                      ),
+                      alignment: Alignment.center,
+                      child: Text(
+                        'Pending: ${pendingCatalog.length}',
+                        style: TextStyle(
+                          fontWeight: FontWeight.bold,
+                          color: _selectedTab == 1 ? Colors.black87 : Colors.black54,
+                        ),
+                      ),
+                    ),
+                  ),
                 ),
               ],
             ),
           ),
+
+          // 3. Search Bar + QR Scan + Loose Item Button (Tarazu)
           Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16.0),
+            padding: const EdgeInsets.symmetric(horizontal: 14.0, vertical: 6.0),
+            child: Row(
+              children: [
+                Expanded(
+                  child: Container(
+                    height: 44,
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: Colors.black12),
+                    ),
+                    child: TextField(
+                      controller: _searchCtrl,
+                      onChanged: (val) => setState(() => _searchQuery = val),
+                      decoration: const InputDecoration(
+                        hintText: 'Search barcode item',
+                        hintStyle: TextStyle(fontSize: 13, color: Colors.black38),
+                        prefixIcon: Icon(Icons.search, size: 20, color: Colors.black45),
+                        border: InputBorder.none,
+                        contentPadding: EdgeInsets.symmetric(vertical: 11),
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                GestureDetector(
+                  onTap: _openStockBarcodeScanner,
+                  child: Container(
+                    height: 44,
+                    width: 44,
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFE8DFC8),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: const Icon(Icons.qr_code_scanner, color: Color(0xFF2D5A27), size: 22),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                GestureDetector(
+                  onTap: _openAddLooseItemModal,
+                  child: Container(
+                    height: 44,
+                    width: 44,
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFE8DFC8),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: const Icon(Icons.scale, color: Color(0xFF2D5A27), size: 22),
+                  ),
+                ),
+              ],
+            ),
+          ),
+
+          // 4. Big Orange Button (Stock barcode items)
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 14.0, vertical: 4.0),
             child: SizedBox(
               width: double.infinity,
-              height: 48,
+              height: 46,
               child: ElevatedButton.icon(
                 style: ElevatedButton.styleFrom(
                   backgroundColor: const Color(0xFFD9822B),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  elevation: 0,
                 ),
                 onPressed: _openStockBarcodeScanner,
-                icon: const Icon(Icons.qr_code_scanner, color: Colors.white),
-                label: const Text('Stock Barcode Scan Karein', style: TextStyle(color: Colors.white, fontSize: 15, fontWeight: FontWeight.bold)),
+                icon: const Icon(Icons.qr_code_scanner, color: Colors.white, size: 20),
+                label: const Text('Stock barcode items', style: TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.bold)),
               ),
             ),
           ),
-          const SizedBox(height: 12),
-          Container(
-            margin: const EdgeInsets.symmetric(horizontal: 16),
-            decoration: BoxDecoration(color: const Color(0xFFE8DFC8), borderRadius: BorderRadius.circular(12)),
-            child: TabBar(
-              controller: _shopTabController,
-              indicator: BoxDecoration(color: const Color(0xFF2D5A27), borderRadius: BorderRadius.circular(12)),
-              labelColor: Colors.white,
-              unselectedLabelColor: Colors.black87,
-              tabs: [
-                Tab(text: 'Dukaan Stock (${confirmedInventory.length})'),
-                Tab(text: 'Pending (${pendingCatalog.length})'),
-              ],
-            ),
-          ),
-          const SizedBox(height: 8),
+
+          // 5. Product List
           Expanded(
-            child: TabBarView(
-              controller: _shopTabController,
-              children: [
-                confirmedInventory.isEmpty
-                    ? const Center(child: Text('Dukaan me koi item nahi hai. Stock jodein!'))
-                    : ListView.builder(
-                        padding: const EdgeInsets.all(16),
-                        itemCount: confirmedInventory.length,
-                        itemBuilder: (ctx, i) {
-                          final item = confirmedInventory[i];
-                          return Card(
-                            color: Colors.white,
-                            elevation: 0,
-                            margin: const EdgeInsets.only(bottom: 8),
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12), side: const BorderSide(color: Colors.black12)),
-                            child: ListTile(
-                              leading: ClipRRect(
-                                borderRadius: BorderRadius.circular(8),
-                                child: Container(
-                                  width: 40,
-                                  height: 40,
-                                  color: const Color(0xFFF3ECE1),
-                                  child: item.imagePath != null
-                                      ? Image.file(File(item.imagePath!), fit: BoxFit.cover)
-                                      : Icon(item.isLoose ? Icons.scale : Icons.inventory_2, color: const Color(0xFF2D5A27)),
-                                ),
-                              ),
-                              title: Text(item.name, style: const TextStyle(fontWeight: FontWeight.bold)),
-                              subtitle: Text('Bikri: ₹${item.sellingPrice} | Stock: ${item.stock.toStringAsFixed(item.isLoose ? 2 : 0)} ${item.isLoose ? 'kg' : 'pcs'}'),
-                              trailing: IconButton(
-                                icon: const Icon(Icons.edit, color: Color(0xFFD9822B)),
-                                onPressed: () => _openStockUpdateDetailModal(item.barcode),
-                              ),
-                            ),
-                          );
-                        },
-                      ),
-                pendingCatalog.isEmpty
-                    ? const Center(child: Text('Koi pending item nahi hai.'))
-                    : ListView.builder(
-                        padding: const EdgeInsets.all(16),
-                        itemCount: pendingCatalog.length,
-                        itemBuilder: (ctx, i) {
-                          final item = pendingCatalog[i];
-                          return Card(
-                            color: Colors.white,
-                            elevation: 0,
-                            margin: const EdgeInsets.only(bottom: 8),
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12), side: const BorderSide(color: Colors.orangeAccent)),
-                            child: ListTile(
-                              title: Text(item.name, style: const TextStyle(fontWeight: FontWeight.bold)),
-                              subtitle: Text('Selling: ₹${item.sellingPrice} | Khareed rate bharna baaki hai'),
-                              trailing: ElevatedButton(
-                                style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFFD9822B)),
-                                onPressed: () => _openStockUpdateDetailModal(item.barcode),
-                                child: const Text('Complete', style: TextStyle(color: Colors.white, fontSize: 12)),
+            child: currentList.isEmpty
+                ? Center(
+                    child: Text(
+                      _selectedTab == 0 ? 'Dukaan me koi item nahi hai. Stock jodein!' : 'Koi pending item nahi hai.',
+                      style: const TextStyle(color: Colors.black45),
+                    ),
+                  )
+                : ListView.builder(
+                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                    itemCount: currentList.length,
+                    itemBuilder: (ctx, i) {
+                      final item = currentList[i];
+                      return Container(
+                        margin: const EdgeInsets.only(bottom: 8),
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(color: Colors.black12),
+                        ),
+                        child: Row(
+                          children: [
+                            ClipRRect(
+                              borderRadius: BorderRadius.circular(8),
+                              child: Container(
+                                width: 44,
+                                height: 44,
+                                color: const Color(0xFFF3ECE1),
+                                child: item.imagePath != null
+                                    ? Image.file(File(item.imagePath!), fit: BoxFit.cover)
+                                    : Icon(item.isLoose ? Icons.scale : Icons.inventory_2, color: const Color(0xFF2D5A27)),
                               ),
                             ),
-                          );
-                        },
-                      ),
-              ],
-            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(item.name, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+                                  const SizedBox(height: 2),
+                                  Text(
+                                    '${item.stock.toStringAsFixed(item.isLoose ? 2 : 0)} ${item.isLoose ? 'kg' : 'piece'}',
+                                    style: const TextStyle(color: Colors.redAccent, fontSize: 12),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            Text('₹${item.sellingPrice.toStringAsFixed(0)}', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                            const SizedBox(width: 8),
+                            IconButton(
+                              icon: const Icon(Icons.edit, color: Color(0xFF2D5A27), size: 18),
+                              onPressed: () => _openStockUpdateDetailModal(item.barcode),
+                            ),
+                          ],
+                        ),
+                      );
+                    },
+                  ),
           ),
         ],
       ),
