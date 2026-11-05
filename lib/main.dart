@@ -14,12 +14,12 @@ void main() async {
 }
 
 class VanikApp extends StatelessWidget {
-  const VanikApp({super.key});
+  const VanikApp({Key? key}) : super(key: key);
 
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'Vanik Dukandar',
+      title: 'General Store POS',
       debugShowCheckedModeBanner: false,
       theme: ThemeData(
         scaffoldBackgroundColor: const Color(0xFFFBF8F2),
@@ -29,7 +29,6 @@ class VanikApp extends StatelessWidget {
           primary: const Color(0xFF2D5A27),
           secondary: const Color(0xFFD9822B),
         ),
-        fontFamily: 'sans-serif',
       ),
       home: const MainNavigationScreen(),
     );
@@ -98,10 +97,10 @@ class CartItem {
 
 class SaleRecord {
   String id;
-  String date; // YYYY-MM-DD
-  String time; // HH:mm
+  String date;
+  String time;
   double totalAmount;
-  String paymentMode; // 'Cash', 'Online', 'Udhaar'
+  String paymentMode;
   String? customerName;
   String? customerPhone;
   bool isPaid;
@@ -147,14 +146,14 @@ class SaleRecord {
 // ----------------- ROOT NAVIGATION -----------------
 
 class MainNavigationScreen extends StatefulWidget {
-  const MainNavigationScreen({super.key});
+  const MainNavigationScreen({Key? key}) : super(key: key);
 
   @override
   State<MainNavigationScreen> createState() => _MainNavigationScreenState();
 }
 
 class _MainNavigationScreenState extends State<MainNavigationScreen> {
-  int _currentIndex = 1; // Default: Make Bill (Centre)
+  int _currentIndex = 1;
   String _shopName = '';
   String _syncCode = '';
   List<ProductItem> _inventory = [];
@@ -224,12 +223,12 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
         content: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Text('Apni dukaan ka naam daaliye:', style: TextStyle(fontSize: 14, color: Colors.black87)),
+            const Text('Apni General Store dukaan ka naam daaliye:', style: TextStyle(fontSize: 14, color: Colors.black87)),
             const SizedBox(height: 12),
             TextField(
               controller: controller,
               decoration: InputDecoration(
-                hintText: 'e.g. Mahato Electronics',
+                hintText: 'e.g. Apna General Store',
                 filled: true,
                 fillColor: Colors.white,
                 border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
@@ -402,7 +401,7 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
     );
   }
 
- Widget _buildNavItem(int index, IconData icon, String label) {
+  Widget _buildNavItem(int index, IconData icon, String label) {
     final isSelected = _currentIndex == index;
     return GestureDetector(
       onTap: () => setState(() => _currentIndex = index),
@@ -455,7 +454,7 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
   }
 }
 
-// ----------------- SCREEN 2: MAKE BILL (SCANNER, BEATS, EDIT, UDHAAR) -----------------
+// ----------------- SCREEN 2: MAKE BILL -----------------
 
 class MakeBillScreen extends StatefulWidget {
   final String shopName;
@@ -465,13 +464,13 @@ class MakeBillScreen extends StatefulWidget {
   final VoidCallback onProfileTap;
 
   const MakeBillScreen({
-    super.key,
+    Key? key,
     required this.shopName,
     required this.inventory,
     required this.onInventoryUpdated,
     required this.onBillCompleted,
     required this.onProfileTap,
-  });
+  }) : super(key: key);
 
   @override
   State<MakeBillScreen> createState() => _MakeBillScreenState();
@@ -497,22 +496,20 @@ class _MakeBillScreenState extends State<MakeBillScreen> {
 
     final now = DateTime.now();
     if (_lastScannedCode == code && now.difference(_lastScanTime).inMilliseconds < 1200) {
-      return; // prevent multi-firing within 1.2s for identical packet position
+      return;
     }
     _lastScannedCode = code;
     _lastScanTime = now;
 
-    // Instant Sound Beep + Vibration
+    // Beep + Vibrate
     SystemSound.play(SystemSoundType.click);
     HapticFeedback.lightImpact();
 
-    // Look up in inventory
     final index = widget.inventory.indexWhere((p) => p.barcode == code);
     if (index != -1) {
       final product = widget.inventory[index];
       _addToCart(product, 1.0, product.sellingPrice);
     } else {
-      // New Unregistered Barcode: Ask for quick selling price and place in Pending Catalog
       _showQuickAddPendingModal(code);
     }
   }
@@ -574,7 +571,6 @@ class _MakeBillScreenState extends State<MakeBillScreen> {
     );
   }
 
-   // Exact Pencil Edit Modal
   void _openPencilEditModal(CartItem item) {
     final qtyCtrl = TextEditingController(text: item.quantity.toString().replaceAll(RegExp(r'\.0$'), ''));
     final priceCtrl = TextEditingController(text: item.unitPrice.toString().replaceAll(RegExp(r'\.0$'), ''));
@@ -692,7 +688,6 @@ class _MakeBillScreenState extends State<MakeBillScreen> {
     );
   }
 
-  // Smart Dual Calculation Loose Item Modal
   void _openLooseItemSelectionModal() {
     final looseProducts = widget.inventory.where((p) => p.isLoose).toList();
 
@@ -798,7 +793,7 @@ class _MakeBillScreenState extends State<MakeBillScreen> {
               controller: weightCtrl,
               keyboardType: const TextInputType.numberWithOptions(decimal: true),
               decoration: const InputDecoration(
-                labelText: 'Wajan (in Kg, e.g. 0.250 for 250g)',
+                labelText: 'Wajan (Kg me, jaise 0.250 for 250g)',
                 suffixText: 'kg',
               ),
               onChanged: (val) {
@@ -815,7 +810,7 @@ class _MakeBillScreenState extends State<MakeBillScreen> {
               controller: amountCtrl,
               keyboardType: const TextInputType.numberWithOptions(decimal: true),
               decoration: const InputDecoration(
-                labelText: 'Rupaye (₹ se calculation, e.g. ₹10)',
+                labelText: 'Rupaye (₹ se hisab, jaise ₹10)',
                 prefixText: '₹ ',
               ),
               onChanged: (val) {
@@ -853,7 +848,6 @@ class _MakeBillScreenState extends State<MakeBillScreen> {
     );
   }
 
- // Udhaar Confirmation Dialog
   void _openUdhaarModal() {
     if (_cart.isEmpty) return;
     final nameCtrl = TextEditingController();
@@ -923,7 +917,6 @@ class _MakeBillScreenState extends State<MakeBillScreen> {
             })
         .toList();
 
-    // Deduct stock for packaged items
     for (var c in _cart) {
       if (!c.product.isLoose) {
         c.product.stock = max(0.0, c.product.stock - c.quantity);
@@ -944,8 +937,6 @@ class _MakeBillScreenState extends State<MakeBillScreen> {
     );
 
     widget.onBillCompleted(sale);
-
-    // Show thermal whatsapp confirmation
     _showInvoiceThermalSuccessSheet(sale);
 
     setState(() {
@@ -1014,7 +1005,6 @@ class _MakeBillScreenState extends State<MakeBillScreen> {
     return SafeArea(
       child: Column(
         children: [
-          // Header Bar
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 14.0, vertical: 8.0),
             child: Row(
@@ -1061,8 +1051,6 @@ class _MakeBillScreenState extends State<MakeBillScreen> {
               ],
             ),
           ),
-
-          // Scanner Camera Area with Flashlight / Torch
           Container(
             height: 180,
             width: double.infinity,
@@ -1080,7 +1068,6 @@ class _MakeBillScreenState extends State<MakeBillScreen> {
                     controller: _scannerController,
                     onDetect: _handleBarcodeDetected,
                   ),
-                  // Green scanning focus rectangle
                   Container(
                     width: 200,
                     height: 100,
@@ -1089,7 +1076,6 @@ class _MakeBillScreenState extends State<MakeBillScreen> {
                       borderRadius: BorderRadius.circular(12),
                     ),
                   ),
-                  // Top Overlay with Back & Flashlight Torch
                   Positioned(
                     top: 10,
                     left: 12,
@@ -1123,8 +1109,6 @@ class _MakeBillScreenState extends State<MakeBillScreen> {
               ),
             ),
           ),
-
- // Action Bar: Active Bill & Loose Item
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
             child: Row(
@@ -1145,9 +1129,7 @@ class _MakeBillScreenState extends State<MakeBillScreen> {
               ],
             ),
           ),
-
-          // Cart Items List
-          Expanded(
+         Expanded(
             child: _cart.isEmpty
                 ? const Center(child: Text('Barcode scan karein ya Loose Item jodein', style: TextStyle(color: Colors.black45)))
                 : ListView.builder(
@@ -1190,12 +1172,10 @@ class _MakeBillScreenState extends State<MakeBillScreen> {
                             ),
                             Text('₹${item.total.toStringAsFixed(0)}', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
                             const SizedBox(width: 8),
-                            // Pencil Icon for Edit
                             IconButton(
                               icon: const Icon(Icons.edit, size: 18, color: Color(0xFF86A873)),
                               onPressed: () => _openPencilEditModal(item),
                             ),
-                            // Delete Button
                             IconButton(
                               icon: const Icon(Icons.delete_outline, size: 20, color: Color(0xFFD9822B)),
                               onPressed: () {
@@ -1208,8 +1188,6 @@ class _MakeBillScreenState extends State<MakeBillScreen> {
                     },
                   ),
           ),
-
-          // Total & Payment Mode Selector
           Container(
             padding: const EdgeInsets.all(16),
             decoration: const BoxDecoration(
@@ -1276,7 +1254,7 @@ class _MakeBillScreenState extends State<MakeBillScreen> {
   }
 }
 
-// ----------------- SCREEN 3: MY SALES (BAR GRAPH + DEDICATED UDHAAR TAB) -----------------
+// ----------------- SCREEN 3: MY SALES -----------------
 
 class MySalesScreen extends StatefulWidget {
   final String shopName;
@@ -1284,11 +1262,11 @@ class MySalesScreen extends StatefulWidget {
   final VoidCallback onSalesUpdated;
 
   const MySalesScreen({
-    super.key,
+    Key? key,
     required this.shopName,
     required this.sales,
     required this.onSalesUpdated,
-  });
+  }) : super(key: key);
 
   @override
   State<MySalesScreen> createState() => _MySalesScreenState();
@@ -1323,7 +1301,7 @@ class _MySalesScreenState extends State<MySalesScreen> with SingleTickerProvider
     );
   }
 
-  void _sendWhatsAppReminder(SaleRecord sale) async {
+   void _sendWhatsAppReminder(SaleRecord sale) async {
     final phone = sale.customerPhone ?? '';
     final buffer = StringBuffer();
     buffer.writeln("*Namaste ${sale.customerName} Ji!*");
@@ -1355,7 +1333,6 @@ class _MySalesScreenState extends State<MySalesScreen> with SingleTickerProvider
     return SafeArea(
       child: Column(
         children: [
-          // Screen Title
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
             child: Row(
@@ -1366,8 +1343,6 @@ class _MySalesScreenState extends State<MySalesScreen> with SingleTickerProvider
               ],
             ),
           ),
-
-          // Custom Tabs: Sales vs Udhaar
           Container(
             margin: const EdgeInsets.symmetric(horizontal: 16),
             decoration: BoxDecoration(color: const Color(0xFFE8DFC8), borderRadius: BorderRadius.circular(16)),
@@ -1382,18 +1357,12 @@ class _MySalesScreenState extends State<MySalesScreen> with SingleTickerProvider
               ],
             ),
           ),
-
           const SizedBox(height: 8),
-
-          // Tab Views
           Expanded(
             child: TabBarView(
               controller: _tabController,
               children: [
-                // TAB 1: SALES & 5-DAY BAR GRAPH
                 _buildSalesGraphView(),
-
-                // TAB 2: DEDICATED UDHAAR TAB
                 _buildUdhaarKhataView(udhaarList),
               ],
             ),
@@ -1409,7 +1378,6 @@ class _MySalesScreenState extends State<MySalesScreen> with SingleTickerProvider
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // 5-Day Sales Bar Chart Simulator
           Container(
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(16), border: Border.all(color: Colors.black12)),
@@ -1448,11 +1416,9 @@ class _MySalesScreenState extends State<MySalesScreen> with SingleTickerProvider
               ],
             ),
           ),
-
           const SizedBox(height: 16),
           const Text('Completed Transactions', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Color(0xFF2D5A27))),
           const SizedBox(height: 8),
-
           ...widget.sales.where((s) => s.isPaid).map((sale) => Card(
                 color: Colors.white,
                 elevation: 0,
@@ -1469,10 +1435,9 @@ class _MySalesScreenState extends State<MySalesScreen> with SingleTickerProvider
     );
   }
 
-  Widget _buildUdhaarKhataView(List<SaleRecord> udhaarList) {
+Widget _buildUdhaarKhataView(List<SaleRecord> udhaarList) {
     return Column(
       children: [
-        // Search Box
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
           child: TextField(
@@ -1490,8 +1455,6 @@ class _MySalesScreenState extends State<MySalesScreen> with SingleTickerProvider
             },
           ),
         ),
-
-        // Udhaar Cards List
         Expanded(
           child: udhaarList.isEmpty
               ? const Center(child: Text('Koi Udhaar pending nahi hai! Sab hisab barabar.'))
@@ -1536,7 +1499,6 @@ class _MySalesScreenState extends State<MySalesScreen> with SingleTickerProvider
                           Row(
                             mainAxisAlignment: MainAxisAlignment.end,
                             children: [
-                              // WhatsApp Reminder Button
                               ElevatedButton.icon(
                                 style: ElevatedButton.styleFrom(
                                   backgroundColor: const Color(0xFF25D366),
@@ -1548,7 +1510,6 @@ class _MySalesScreenState extends State<MySalesScreen> with SingleTickerProvider
                                 onPressed: () => _sendWhatsAppReminder(sale),
                               ),
                               const SizedBox(width: 8),
-                              // Mark Paid Button
                               ElevatedButton(
                                 style: ElevatedButton.styleFrom(
                                   backgroundColor: const Color(0xFF2D5A27),
@@ -1570,7 +1531,7 @@ class _MySalesScreenState extends State<MySalesScreen> with SingleTickerProvider
     );
   }
 }
-// ----------------- SCREEN 1: MY SHOP (INVENTORY, LOOSE POTLI, STOCK) -----------------
+// ----------------- SCREEN 1: MY SHOP -----------------
 
 class MyShopScreen extends StatefulWidget {
   final String shopName;
@@ -1578,11 +1539,11 @@ class MyShopScreen extends StatefulWidget {
   final VoidCallback onInventoryUpdated;
 
   const MyShopScreen({
-    super.key,
+    Key? key,
     required this.shopName,
     required this.inventory,
     required this.onInventoryUpdated,
-  });
+  }) : super(key: key);
 
   @override
   State<MyShopScreen> createState() => _MyShopScreenState();
@@ -1702,7 +1663,8 @@ class _MyShopScreenState extends State<MyShopScreen> with SingleTickerProviderSt
       },
     );
   }
-void _openStockBarcodeScanner() {
+
+  void _openStockBarcodeScanner() {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -1724,10 +1686,13 @@ void _openStockBarcodeScanner() {
             Expanded(
               child: MobileScanner(
                 onDetect: (capture) {
-                  final code = capture.barcodes.firstOrNull?.rawValue;
-                  if (code != null && code.trim().isNotEmpty) {
-                    Navigator.pop(ctx);
-                    _openStockUpdateDetailModal(code);
+                  final barcodes = capture.barcodes;
+                  if (barcodes.isNotEmpty) {
+                    final code = barcodes.first.rawValue;
+                    if (code != null && code.trim().isNotEmpty) {
+                      Navigator.pop(ctx);
+                      _openStockUpdateDetailModal(code);
+                    }
                   }
                 },
               ),
@@ -1744,54 +1709,92 @@ void _openStockBarcodeScanner() {
     final sellCtrl = TextEditingController(text: existingIndex != -1 ? widget.inventory[existingIndex].sellingPrice.toString() : '');
     final buyCtrl = TextEditingController(text: existingIndex != -1 ? widget.inventory[existingIndex].purchasePrice.toString() : '');
     final addStockCtrl = TextEditingController(text: '10');
+    String? currentImagePath = existingIndex != -1 ? widget.inventory[existingIndex].imagePath : null;
 
     showDialog(
       context: context,
-      builder: (ctx) => AlertDialog(
-        backgroundColor: const Color(0xFFFBF8F2),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: Text(existingIndex != -1 ? 'Stock Badhayein' : 'Naya Packet Item', style: const TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF2D5A27))),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            TextField(controller: nameCtrl, decoration: const InputDecoration(labelText: 'Product Name')),
-            TextField(controller: buyCtrl, keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: 'Khareed Rate (₹)')),
-            TextField(controller: sellCtrl, keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: 'Bikri Rate (₹)')),
-            TextField(controller: addStockCtrl, keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: 'Kitna Piece Add Karna Hai?')),
-          ],
-        ),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
-          ElevatedButton(
-            style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFFD9822B)),
-            onPressed: () {
-              final added = double.tryParse(addStockCtrl.text.trim()) ?? 0.0;
-              final sell = double.tryParse(sellCtrl.text.trim()) ?? 0.0;
-              final buy = double.tryParse(buyCtrl.text.trim()) ?? 0.0;
+      builder: (ctx) => StatefulBuilder(
+        builder: (dialogCtx, setDialogState) {
+          return AlertDialog(
+            backgroundColor: const Color(0xFFFBF8F2),
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+            title: Text(existingIndex != -1 ? 'Stock Badhayein' : 'Naya Packet Item', style: const TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF2D5A27))),
+            content: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Center(
+                    child: GestureDetector(
+                      onTap: () async {
+                        final XFile? img = await _picker.pickImage(source: ImageSource.camera);
+                        if (img != null) {
+                          setDialogState(() => currentImagePath = img.path);
+                        }
+                      },
+                      child: Container(
+                        width: 70,
+                        height: 70,
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(color: const Color(0xFF2D5A27)),
+                        ),
+                        child: currentImagePath != null
+                            ? ClipRRect(borderRadius: BorderRadius.circular(12), child: Image.file(File(currentImagePath!), fit: BoxFit.cover))
+                            : const Column(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  Icon(Icons.camera_alt, color: Color(0xFF2D5A27), size: 22),
+                                  Text('Packet Photo', style: TextStyle(fontSize: 9, color: Colors.black54)),
+                                ],
+                              ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+                  TextField(controller: nameCtrl, decoration: const InputDecoration(labelText: 'Product Name')),
+                  TextField(controller: buyCtrl, keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: 'Khareed Rate (₹)')),
+                  TextField(controller: sellCtrl, keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: 'Bikri Rate (₹)')),
+                  TextField(controller: addStockCtrl, keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: 'Kitna Piece Add Karna Hai?')),
+                ],
+              ),
+            ),
+            actions: [
+              TextButton(onPressed: () => Navigator.pop(dialogCtx), child: const Text('Cancel')),
+              ElevatedButton(
+                style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFFD9822B)),
+                onPressed: () {
+                  final added = double.tryParse(addStockCtrl.text.trim()) ?? 0.0;
+                  final sell = double.tryParse(sellCtrl.text.trim()) ?? 0.0;
+                  final buy = double.tryParse(buyCtrl.text.trim()) ?? 0.0;
 
-              if (existingIndex != -1) {
-                widget.inventory[existingIndex].stock += added;
-                widget.inventory[existingIndex].sellingPrice = sell;
-                widget.inventory[existingIndex].purchasePrice = buy;
-                widget.inventory[existingIndex].isPending = false;
-              } else {
-                widget.inventory.add(ProductItem(
-                  barcode: barcode,
-                  name: nameCtrl.text.trim().isEmpty ? 'Item $barcode' : nameCtrl.text.trim(),
-                  sellingPrice: sell,
-                  purchasePrice: buy,
-                  stock: added,
-                  isLoose: false,
-                  isPending: false,
-                ));
-              }
-              widget.onInventoryUpdated();
-              setState(() {});
-              Navigator.pop(ctx);
-            },
-            child: const Text('Save Stock', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
-          ),
-        ],
+                  if (existingIndex != -1) {
+                    widget.inventory[existingIndex].stock += added;
+                    widget.inventory[existingIndex].sellingPrice = sell;
+                    widget.inventory[existingIndex].purchasePrice = buy;
+                    widget.inventory[existingIndex].imagePath = currentImagePath;
+                    widget.inventory[existingIndex].isPending = false;
+                  } else {
+                    widget.inventory.add(ProductItem(
+                      barcode: barcode,
+                      name: nameCtrl.text.trim().isEmpty ? 'Item $barcode' : nameCtrl.text.trim(),
+                      sellingPrice: sell,
+                      purchasePrice: buy,
+                      stock: added,
+                      imagePath: currentImagePath,
+                      isLoose: false,
+                      isPending: false,
+                    ));
+                  }
+                  widget.onInventoryUpdated();
+                  setState(() {});
+                  Navigator.pop(dialogCtx);
+                },
+                child: const Text('Save Stock', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+              ),
+            ],
+          );
+        },
       ),
     );
   }
@@ -1804,14 +1807,12 @@ void _openStockBarcodeScanner() {
     return SafeArea(
       child: Column(
         children: [
-          // Header
           Padding(
             padding: const EdgeInsets.all(16.0),
             child: Row(
               children: [
                 Text(widget.shopName.isEmpty ? 'My Shop' : widget.shopName, style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: Color(0xFF2D5A27))),
                 const Spacer(),
-                // Add Loose Item Button
                 ElevatedButton.icon(
                   style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFFE8DFC8), elevation: 0),
                   onPressed: _openAddLooseItemModal,
@@ -1821,8 +1822,6 @@ void _openStockBarcodeScanner() {
               ],
             ),
           ),
-
-          // Big Mustard Stock Scanner Button
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16.0),
             child: SizedBox(
@@ -1839,10 +1838,7 @@ void _openStockBarcodeScanner() {
               ),
             ),
           ),
-
           const SizedBox(height: 12),
-
-          // Tabs: Main Inventory vs Pending Catalog
           Container(
             margin: const EdgeInsets.symmetric(horizontal: 16),
             decoration: BoxDecoration(color: const Color(0xFFE8DFC8), borderRadius: BorderRadius.circular(12)),
@@ -1857,14 +1853,11 @@ void _openStockBarcodeScanner() {
               ],
             ),
           ),
-
           const SizedBox(height: 8),
-
           Expanded(
             child: TabBarView(
               controller: _shopTabController,
               children: [
-                // Confirmed Inventory List
                 confirmedInventory.isEmpty
                     ? const Center(child: Text('Dukaan me koi item nahi hai. Stock jodein!'))
                     : ListView.builder(
@@ -1899,8 +1892,6 @@ void _openStockBarcodeScanner() {
                           );
                         },
                       ),
-
-                // Pending Unconfigured Catalog
                 pendingCatalog.isEmpty
                     ? const Center(child: Text('Koi pending item nahi hai.'))
                     : ListView.builder(
@@ -1932,4 +1923,4 @@ void _openStockBarcodeScanner() {
       ),
     );
   }
-  
+}
