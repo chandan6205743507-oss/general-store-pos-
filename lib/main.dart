@@ -1392,7 +1392,7 @@ class MySalesScreen extends StatelessWidget {
                     final dayTotal = sales
                         .where((s) => s.date.day == targetDate.day && s.date.month == targetDate.month && s.date.year == targetDate.year)
                         .fold(0.0, (sum, r) => sum + r.total);
-                    final double barHeight = (dayTotal > 0 ? (dayTotal / 500.0) * 60 : 6).clamp(6.0, 70.0);
+                    final double barHeight = ((dayTotal > 0 ? (dayTotal / 500.0) * 60 : 6).clamp(6.0, 70.0)).toDouble();
 
                     return Column(
                       mainAxisAlignment: MainAxisAlignment.end,
