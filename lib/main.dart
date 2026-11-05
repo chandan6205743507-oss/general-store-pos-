@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'dart:io';
+import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
@@ -162,7 +163,6 @@ class VanikApp extends StatelessWidget {
     );
   }
 }
-
 // ==========================================
 // 3. PERSISTENT NAVIGATION & TOP PROFILE
 // ==========================================
@@ -174,8 +174,9 @@ class MainNavigationScreen extends StatefulWidget {
 }
 
 class _MainNavigationScreenState extends State<MainNavigationScreen> {
-  int _currentIndex = 0; // Default: My Shop
+  int _currentIndex = 0;
   String _shopName = '';
+  String _shopSyncCode = '';
   List<ProductItem> _inventory = [];
   List<SaleRecord> _sales = [];
   bool _isLoading = true;
@@ -188,19 +189,27 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
 
   Future<void> _loadStateFromDisk() async {
     final prefs = await SharedPreferences.getInstance();
-    final invString = prefs.getString('vanik_kirana_inventory_db');
-    final salesString = prefs.getString('vanik_kirana_sales_db');
+    final invString = prefs.getString('vanik_kirana_inventory_db_v4');
+    final salesString = prefs.getString('vanik_kirana_sales_db_v4');
     final savedShop = prefs.getString('vanik_kirana_shop_name');
+    final savedCode = prefs.getString('vanik_kirana_shop_code');
 
     if (savedShop != null && savedShop.trim().isNotEmpty) {
       _shopName = savedShop;
+    }
+
+    if (savedCode != null && savedCode.trim().isNotEmpty) {
+      _shopSyncCode = savedCode;
+    } else {
+      _shopSyncCode = (100000 + Random().nextInt(900000)).toString();
+      await prefs.setString('vanik_kirana_shop_code', _shopSyncCode);
     }
 
     if (invString != null) {
       final List dec = jsonDecode(invString);
       _inventory = dec.map((e) => ProductItem.fromMap(e)).toList();
     } else {
-      _inventory = []; // Pure public clean start for any store owner
+      _inventory = []; // Clean start for any shop owner
     }
 
     if (salesString != null) {
@@ -210,7 +219,6 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
 
     setState(() => _isLoading = false);
 
-    // Initial Onboarding Prompt for shop owner
     if (_shopName.isEmpty) {
       WidgetsBinding.instance.addPostFrameCallback((_) => _promptShopNameSetup(isFirstTime: true));
     }
@@ -218,9 +226,10 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
 
   Future<void> _commitStateToDisk() async {
     final prefs = await SharedPreferences.getInstance();
-    await prefs.setString('vanik_kirana_inventory_db', jsonEncode(_inventory.map((e) => e.toMap()).toList()));
-    await prefs.setString('vanik_kirana_sales_db', jsonEncode(_sales.map((e) => e.toMap()).toList()));
+    await prefs.setString('vanik_kirana_inventory_db_v4', jsonEncode(_inventory.map((e) => e.toMap()).toList()));
+    await prefs.setString('vanik_kirana_sales_db_v4', jsonEncode(_sales.map((e) => e.toMap()).toList()));
     await prefs.setString('vanik_kirana_shop_name', _shopName);
+    await prefs.setString('vanik_kirana_shop_code', _shopSyncCode);
   }
 
   void _promptShopNameSetup({bool isFirstTime = false}) {
@@ -229,28 +238,33 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
       context: context,
       barrierDismissible: !isFirstTime,
       builder: (ctx) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: Text(isFirstTime ? 'Setup Your Kirana Store' : 'Dukaan Ka Naam Edit Karein', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 17)),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: Text(isFirstTime ? 'Dukaan Setup Karein' : 'Dukaan Ka Naam Badlein', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text('Apni dukaan ka naam daalein jo customer bill aur WhatsApp receipt me print hoga:'),
+            const Text('Apni dukaan ka naam daalein jo customer bill aur WhatsApp receipt par print hoga:'),
             const SizedBox(height: 12),
             TextField(
               controller: nameCtrl,
               autofocus: true,
               decoration: InputDecoration(
-                hintText: 'e.g. Maa Durga General Store',
+                hintText: 'e.g. Maa Durga Kirana Store',
                 labelText: 'Store / Owner Name',
-                border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
               ),
             ),
           ],
         ),
         actions: [
           ElevatedButton(
-            style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF2D5A27), foregroundColor: Colors.white, minimumSize: const Size(double.infinity, 44)),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFF2D5A27),
+              foregroundColor: Colors.white,
+              minimumSize: const Size(double.infinity, 44),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            ),
             onPressed: () {
               if (nameCtrl.text.trim().isNotEmpty) {
                 setState(() => _shopName = nameCtrl.text.trim());
@@ -259,6 +273,75 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
               }
             },
             child: const Text('Save & Continue', style: TextStyle(fontWeight: FontWeight.bold)),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _openSyncAndStaffDialog() {
+    final codeCtrl = TextEditingController();
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: const Text('Shop Staff & Multi-User Sync', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(color: const Color(0xFFFBF8F2), borderRadius: BorderRadius.circular(12), border: Border.all(color: const Color(0xFFE8DFC8))),
+              child: Column(
+                children: [
+                  const Text('Aapki Dukaan Ka Joining Code:', style: TextStyle(fontSize: 12, color: Colors.grey)),
+                  const SizedBox(height: 4),
+                  Text(_shopSyncCode, style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold, letterSpacing: 3, color: Color(0xFF2D5A27))),
+                  const SizedBox(height: 4),
+                  const Text('Staff ke phone me ye code daalkar sync karein', textAlign: TextAlign.center, style: TextStyle(fontSize: 11, color: Colors.grey)),
+                ],
+              ),
+            ),
+            const SizedBox(height: 16),
+            const Divider(),
+            const SizedBox(height: 8),
+            const Text('Doosri dukaan se judna chahte hain?', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+            const SizedBox(height: 8),
+            TextField(
+              controller: codeCtrl,
+              keyboardType: TextInputType.number,
+              decoration: InputDecoration(
+                hintText: 'Enter 6-digit Code',
+                labelText: 'Join Shop Code',
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          Row(
+            children: [
+              Expanded(
+                child: TextButton(
+                  onPressed: () => Navigator.pop(ctx),
+                  child: const Text('Close'),
+                ),
+              ),
+              Expanded(
+                child: ElevatedButton(
+                  style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFFD9822B), foregroundColor: Colors.white),
+                  onPressed: () {
+                    if (codeCtrl.text.trim().isNotEmpty) {
+                      setState(() => _shopSyncCode = codeCtrl.text.trim());
+                      _commitStateToDisk();
+                      Navigator.pop(ctx);
+                      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Shop Joining Code updated successfully!')));
+                    }
+                  },
+                  child: const Text('Join Shop'),
+                ),
+              ),
+            ],
           ),
         ],
       ),
@@ -286,6 +369,13 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
       } else {
         _inventory.add(item);
       }
+    });
+    _commitStateToDisk();
+  }
+
+  void _deleteProduct(String barcode) {
+    setState(() {
+      _inventory.removeWhere((p) => p.barcode == barcode);
     });
     _commitStateToDisk();
   }
@@ -347,14 +437,17 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
                 ),
               ),
               const SizedBox(width: 8),
-              Container(
-                padding: const EdgeInsets.all(8),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(14),
-                  border: Border.all(color: const Color(0xFFE8DFC8)),
+              InkWell(
+                onTap: _openSyncAndStaffDialog,
+                child: Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(14),
+                    border: Border.all(color: const Color(0xFFE8DFC8)),
+                  ),
+                  child: const Icon(Icons.verified, size: 18, color: Color(0xFF7FA06B)),
                 ),
-                child: const Icon(Icons.verified, size: 18, color: Color(0xFF7FA06B)),
               ),
             ],
           ),
@@ -362,7 +455,8 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
       ),
     );
   }
-@override
+
+  @override
   Widget build(BuildContext context) {
     if (_isLoading) {
       return const Scaffold(body: Center(child: CircularProgressIndicator()));
@@ -372,6 +466,7 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
       MyShopScreen(
         inventory: _inventory,
         onProductUpdated: _saveOrUpdateProduct,
+        onProductDeleted: _deleteProduct,
       ),
       MakeBillScreen(
         inventory: _inventory,
@@ -381,6 +476,7 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
       ),
       MySalesScreen(
         sales: _sales,
+        shopName: _shopName.isEmpty ? 'Kirana Store' : _shopName,
         onUdhaarCleared: _settleUdhaarRecord,
       ),
     ];
@@ -448,7 +544,6 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
     );
   }
 }
-
 // ==========================================
 // 4. SCREEN: MAKE BILL (SCANNER & CART)
 // ==========================================
@@ -564,7 +659,8 @@ class _MakeBillScreenState extends State<MakeBillScreen> {
       ),
     );
   }
-void _displayNewBarcodePrompt(String code) {
+
+  void _displayNewBarcodePrompt(String code) {
     final nameCtrl = TextEditingController();
     final priceCtrl = TextEditingController();
 
@@ -732,18 +828,26 @@ void _displayNewBarcodePrompt(String code) {
             const SizedBox(height: 8),
             Expanded(
               child: looseList.isEmpty
-                  ? const Center(child: Text('No loose items yet. Add them in My Shop tab.'))
+                  ? const Center(child: Text('No loose items in shop yet.'))
                   : ListView.builder(
                       itemCount: looseList.length,
-                      itemBuilder: (ctx, i) => ListTile(
-                        leading: const CircleAvatar(backgroundColor: Color(0xFFE8DFC8), child: Icon(Icons.scale, color: Color(0xFF2D5A27))),
-                        title: Text(looseList[i].name, style: const TextStyle(fontWeight: FontWeight.bold)),
-                        subtitle: Text('Rate: ₹${looseList[i].sellingPrice}/kg | Stock: ${looseList[i].stock} kg'),
-                        onTap: () {
-                          Navigator.pop(c);
-                          _displayAddToCartSheet(looseList[i]);
-                        },
-                      ),
+                      itemBuilder: (ctx, i) {
+                        final item = looseList[i];
+                        return ListTile(
+                          leading: ClipRRect(
+                            borderRadius: BorderRadius.circular(8),
+                            child: item.imagePath.isNotEmpty
+                                ? Image.file(File(item.imagePath), width: 44, height: 44, fit: BoxFit.cover, errorBuilder: (_, __, ___) => const Icon(Icons.scale, size: 36))
+                                : const CircleAvatar(backgroundColor: Color(0xFFE8DFC8), child: Icon(Icons.scale, color: Color(0xFF2D5A27))),
+                          ),
+                          title: Text(item.name, style: const TextStyle(fontWeight: FontWeight.bold)),
+                          subtitle: Text('Rate: ₹${item.sellingPrice.toStringAsFixed(0)}/kg | Stock: ${item.stock.toStringAsFixed(0)} kg'),
+                          onTap: () {
+                            Navigator.pop(c);
+                            _displayAddToCartSheet(item);
+                          },
+                        );
+                      },
                     ),
             ),
           ],
@@ -751,7 +855,8 @@ void _displayNewBarcodePrompt(String code) {
       ),
     );
   }
-@override
+
+  @override
   Widget build(BuildContext context) {
     return Column(
       children: [
@@ -853,18 +958,19 @@ void _displayNewBarcodePrompt(String code) {
     );
   }
 }
-
 // ==========================================
-// 5. SCREEN: MY SHOP (CAMERA PHOTO & VANIK CARDS)
+// 5. SCREEN: MY SHOP (BARCODE & LOOSE VIEWS)
 // ==========================================
 class MyShopScreen extends StatefulWidget {
   final List<ProductItem> inventory;
   final Function(ProductItem) onProductUpdated;
+  final Function(String) onProductDeleted;
 
   const MyShopScreen({
     super.key,
     required this.inventory,
     required this.onProductUpdated,
+    required this.onProductDeleted,
   });
 
   @override
@@ -872,10 +978,11 @@ class MyShopScreen extends StatefulWidget {
 }
 
 class _MyShopScreenState extends State<MyShopScreen> {
-  int _activeSubTab = 0;
+  int _activeSubTab = 0; // 0: Shop items, 1: Pending
+  bool _isLooseMode = false; // False: Barcode, True: Loose Commodity
   final ImagePicker _picker = ImagePicker();
 
-  Future<void> _pickImage(ProductItem item, StateSetter setModalState) async {
+  Future<void> _pickImageForProduct(ProductItem item, StateSetter setModalState) async {
     showModalBottomSheet(
       context: context,
       builder: (ctx) => SafeArea(
@@ -909,7 +1016,190 @@ class _MyShopScreenState extends State<MyShopScreen> {
     );
   }
 
-  void _openStockBarcodeScanner() {
+  // Exact Vanik Stock & Edit Modal (Screenshot 43)
+  void _openExactVanikModal(ProductItem item, {bool isNew = false}) {
+    final nameCtrl = TextEditingController(text: item.name);
+    final buyCtrl = TextEditingController(text: item.buyingPrice > 0 ? item.buyingPrice.toStringAsFixed(0) : '');
+    final sellCtrl = TextEditingController(text: item.sellingPrice > 0 ? item.sellingPrice.toStringAsFixed(0) : '');
+    final stockCtrl = TextEditingController(text: item.stock > 0 ? item.stock.toStringAsFixed(0) : '');
+
+    final isLoose = item.type == ItemType.loose;
+
+    showDialog(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (context, setModalState) => AlertDialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+          contentPadding: const EdgeInsets.all(20),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Stack(
+                      alignment: Alignment.center,
+                      children: [
+                        Container(
+                          width: 88,
+                          height: 88,
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFF4F1EA),
+                            borderRadius: BorderRadius.circular(16),
+                            border: Border.all(color: const Color(0xFFECE7DC)),
+                            image: item.imagePath.isNotEmpty
+                                ? DecorationImage(image: FileImage(File(item.imagePath)), fit: BoxFit.cover)
+                                : null,
+                          ),
+                          child: item.imagePath.isEmpty
+                              ? const Icon(Icons.inventory_2_outlined, size: 36, color: Color(0xFF2D5A27))
+                              : null,
+                        ),
+                        Positioned(
+                          bottom: 4,
+                          left: 4,
+                          child: InkWell(
+                            onTap: () => _pickImageForProduct(item, setModalState),
+                            child: Container(
+                              padding: const EdgeInsets.all(6),
+                              decoration: const BoxDecoration(
+                                color: Colors.white,
+                                shape: BoxShape.circle,
+                                boxShadow: [BoxShadow(color: Colors.black26, blurRadius: 4)],
+                              ),
+                              child: const Icon(Icons.camera_alt, size: 16, color: Colors.black87),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(width: 14),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.end,
+                        children: [
+                          Text(
+                            item.barcode.length > 12 ? item.barcode.substring(0, 11) : item.barcode,
+                            style: const TextStyle(color: Colors.grey, fontSize: 13),
+                          ),
+                          const SizedBox(height: 6),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFF4F1EA),
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.center,
+                              children: [
+                                const Text('Product name', style: TextStyle(color: Color(0xFF9E8A68), fontSize: 12, fontWeight: FontWeight.bold)),
+                                TextField(
+                                  controller: nameCtrl,
+                                  textAlign: TextAlign.center,
+                                  decoration: const InputDecoration(border: InputBorder.none, isDense: true, contentPadding: EdgeInsets.symmetric(vertical: 4)),
+                                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 18),
+                _buildInputRow(
+                  label: isLoose ? 'Buying price of 1 Kg' : 'Buying price of 1 Piece',
+                  controller: buyCtrl,
+                ),
+                const SizedBox(height: 10),
+                _buildInputRow(
+                  label: isLoose ? 'Your selling price of 1 Kg' : 'Your selling price of 1 Piece',
+                  controller: sellCtrl,
+                ),
+                const SizedBox(height: 10),
+                _buildInputRow(
+                  label: isLoose ? 'Current kilos in shop' : 'Current pieces in shop',
+                  controller: stockCtrl,
+                ),
+                const SizedBox(height: 22),
+                Row(
+                  children: [
+                    if (!isNew)
+                      InkWell(
+                        onTap: () {
+                          widget.onProductDeleted(item.barcode);
+                          Navigator.pop(ctx);
+                        },
+                        child: Container(
+                          padding: const EdgeInsets.all(12),
+                          decoration: BoxDecoration(
+                            border: Border.all(color: Colors.grey.shade300),
+                            borderRadius: BorderRadius.circular(14),
+                          ),
+                          child: const Icon(Icons.delete_outline, color: Colors.grey, size: 24),
+                        ),
+                      ),
+                    if (!isNew) const SizedBox(width: 12),
+                    Expanded(
+                      child: ElevatedButton(
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFFD9822B),
+                          foregroundColor: Colors.white,
+                          minimumSize: const Size(double.infinity, 50),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                        ),
+                        onPressed: () {
+                          item.name = nameCtrl.text.trim().isNotEmpty ? nameCtrl.text.trim() : (isLoose ? 'Loose Commodity' : 'Item ${item.barcode}');
+                          item.buyingPrice = double.tryParse(buyCtrl.text) ?? 0.0;
+                          item.sellingPrice = double.tryParse(sellCtrl.text) ?? 0.0;
+                          item.stock = double.tryParse(stockCtrl.text) ?? 0.0;
+                          item.isPending = false;
+                          widget.onProductUpdated(item);
+                          Navigator.pop(ctx);
+                        },
+                        child: Text(isNew ? 'Save' : 'Update', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildInputRow({required String label, required TextEditingController controller}) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: const Color(0xFFECE7DC)),
+      ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Expanded(child: Text(label, style: const TextStyle(color: Colors.grey, fontSize: 14))),
+          SizedBox(
+            width: 70,
+            child: TextField(
+              controller: controller,
+              textAlign: TextAlign.center,
+              keyboardType: const TextInputType.numberWithOptions(decimal: true),
+              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+              decoration: const InputDecoration(border: InputBorder.none, isDense: true),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _openBarcodeStockFlow() {
     showDialog(
       context: context,
       builder: (ctx) => Dialog(
@@ -917,14 +1207,28 @@ class _MyShopScreenState extends State<MyShopScreen> {
           height: 300,
           child: Column(
             children: [
-              const Padding(padding: EdgeInsets.all(8), child: Text('Scan Item to Stock', style: TextStyle(fontWeight: FontWeight.bold))),
+              const Padding(padding: EdgeInsets.all(8), child: Text('Scan Barcode to Stock', style: TextStyle(fontWeight: FontWeight.bold))),
               Expanded(
                 child: MobileScanner(
                   onDetect: (capture) {
                     for (final b in capture.barcodes) {
                       if (b.rawValue != null && b.rawValue!.isNotEmpty) {
                         Navigator.pop(ctx);
-                        _showStockDetailsInput(b.rawValue!);
+                        final existing = widget.inventory.where((p) => p.barcode == b.rawValue!).toList();
+                        if (existing.isNotEmpty) {
+                          _openExactVanikModal(existing.first);
+                        } else {
+                          final newItem = ProductItem(
+                            id: 'item_${DateTime.now().millisecondsSinceEpoch}',
+                            name: '',
+                            barcode: b.rawValue!,
+                            sellingPrice: 0.0,
+                            buyingPrice: 0.0,
+                            stock: 0.0,
+                            type: ItemType.piece,
+                          );
+                          _openExactVanikModal(newItem, isNew: true);
+                        }
                         break;
                       }
                     }
@@ -938,224 +1242,24 @@ class _MyShopScreenState extends State<MyShopScreen> {
     );
   }
 
-  void _showStockDetailsInput(String barcode) {
-    final nameCtrl = TextEditingController();
-    final totalCostCtrl = TextEditingController();
-    final totalPcsCtrl = TextEditingController();
-    final sellPriceCtrl = TextEditingController();
-    String tempImagePath = '';
-
-    showDialog(
-      context: context,
-      builder: (ctx) => StatefulBuilder(
-        builder: (context, setModalState) => AlertDialog(
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-          title: Text('Stock Item: $barcode', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-          content: SingleChildScrollView(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Center(
-                  child: Stack(
-                    children: [
-                      Container(
-                        width: 75,
-                        height: 75,
-                        decoration: BoxDecoration(
-                          color: const Color(0xFFE8DFC8),
-                          borderRadius: BorderRadius.circular(12),
-                          image: tempImagePath.isNotEmpty ? DecorationImage(image: FileImage(File(tempImagePath)), fit: BoxFit.cover) : null,
-                        ),
-                        child: tempImagePath.isEmpty ? const Icon(Icons.camera_alt, size: 32, color: Color(0xFF2D5A27)) : null,
-                      ),
-                      Positioned(
-                        bottom: 0,
-                        right: 0,
-                        child: InkWell(
-                          onTap: () async {
-                            final picked = await _picker.pickImage(source: ImageSource.camera, maxWidth: 600);
-                            if (picked != null) setModalState(() => tempImagePath = picked.path);
-                          },
-                          child: const CircleAvatar(radius: 12, backgroundColor: Color(0xFF2D5A27), child: Icon(Icons.add, size: 14, color: Colors.white)),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: 10),
-                TextField(controller: nameCtrl, decoration: const InputDecoration(labelText: 'Product Name', border: OutlineInputBorder())),
-                const SizedBox(height: 8),
-                TextField(controller: totalCostCtrl, keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: 'Total Amount Paid to Distributor (₹)', border: OutlineInputBorder())),
-                const SizedBox(height: 8),
-                TextField(controller: totalPcsCtrl, keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: 'Total Pieces Bought', border: OutlineInputBorder())),
-                const SizedBox(height: 8),
-                TextField(controller: sellPriceCtrl, keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: 'Selling Price per Piece (₹)', border: OutlineInputBorder())),
-              ],
-            ),
-          ),
-          actions: [
-            ElevatedButton(
-              style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFFD9822B), foregroundColor: Colors.white, minimumSize: const Size(double.infinity, 44)),
-              onPressed: () {
-                final pcs = double.tryParse(totalPcsCtrl.text) ?? 1.0;
-                final cost = double.tryParse(totalCostCtrl.text) ?? 0.0;
-                final sell = double.tryParse(sellPriceCtrl.text) ?? 0.0;
-                final unitCost = pcs > 0 ? (cost / pcs) : 0.0;
-
-                final item = ProductItem(
-                  id: 'item_${DateTime.now().millisecondsSinceEpoch}',
-                  name: nameCtrl.text.trim().isNotEmpty ? nameCtrl.text.trim() : 'Item $barcode',
-                  barcode: barcode,
-                  sellingPrice: sell,
-                  buyingPrice: unitCost,
-                  stock: pcs,
-                  type: ItemType.piece,
-                  imagePath: tempImagePath,
-                  isPending: false,
-                );
-                widget.onProductUpdated(item);
-                Navigator.pop(ctx);
-              },
-              child: const Text('Add to Shop Stock', style: TextStyle(fontWeight: FontWeight.bold)),
-            ),
-          ],
-        ),
-      ),
+  void _openLooseStockFlow() {
+    final newItem = ProductItem(
+      id: 'loose_${DateTime.now().millisecondsSinceEpoch}',
+      name: '',
+      barcode: 'L_${DateTime.now().millisecondsSinceEpoch}',
+      sellingPrice: 0.0,
+      buyingPrice: 0.0,
+      stock: 0.0,
+      type: ItemType.loose,
     );
-  }
-void _openStockEditModal(ProductItem item) {
-    final buyCtrl = TextEditingController(text: item.buyingPrice > 0 ? item.buyingPrice.toStringAsFixed(0) : '');
-    final sellCtrl = TextEditingController(text: item.sellingPrice.toStringAsFixed(0));
-    final stockCtrl = TextEditingController(text: item.stock.toStringAsFixed(0));
-    final nameCtrl = TextEditingController(text: item.name);
-
-    showDialog(
-      context: context,
-      builder: (ctx) => StatefulBuilder(
-        builder: (context, setModalState) => AlertDialog(
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-          title: const Text('Edit Product Details', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-          content: SingleChildScrollView(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Center(
-                  child: Stack(
-                    children: [
-                      Container(
-                        width: 80,
-                        height: 80,
-                        decoration: BoxDecoration(
-                          color: const Color(0xFFE8DFC8),
-                          borderRadius: BorderRadius.circular(12),
-                          image: item.imagePath.isNotEmpty ? DecorationImage(image: FileImage(File(item.imagePath)), fit: BoxFit.cover) : null,
-                        ),
-                        child: item.imagePath.isEmpty ? const Icon(Icons.camera_alt, size: 36, color: Color(0xFF2D5A27)) : null,
-                      ),
-                      Positioned(
-                        bottom: 0,
-                        right: 0,
-                        child: InkWell(
-                          onTap: () => _pickImage(item, setModalState),
-                          child: const CircleAvatar(
-                            radius: 14,
-                            backgroundColor: Color(0xFF2D5A27),
-                            child: Icon(Icons.edit, size: 14, color: Colors.white),
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: 12),
-                TextField(controller: nameCtrl, decoration: const InputDecoration(labelText: 'Product Name', border: OutlineInputBorder())),
-                const SizedBox(height: 10),
-                TextField(controller: buyCtrl, keyboardType: const TextInputType.numberWithOptions(decimal: true), decoration: const InputDecoration(labelText: 'Buying Price (Cost ₹)', border: OutlineInputBorder())),
-                const SizedBox(height: 10),
-                TextField(controller: sellCtrl, keyboardType: const TextInputType.numberWithOptions(decimal: true), decoration: const InputDecoration(labelText: 'Selling Price (Rate ₹)', border: OutlineInputBorder())),
-                const SizedBox(height: 10),
-                TextField(controller: stockCtrl, keyboardType: const TextInputType.numberWithOptions(decimal: true), decoration: const InputDecoration(labelText: 'Total Current Stock', border: OutlineInputBorder())),
-              ],
-            ),
-          ),
-          actions: [
-            ElevatedButton(
-              style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF2D5A27), foregroundColor: Colors.white, minimumSize: const Size(double.infinity, 44)),
-              onPressed: () {
-                item.name = nameCtrl.text.trim();
-                item.buyingPrice = double.tryParse(buyCtrl.text) ?? item.buyingPrice;
-                item.sellingPrice = double.tryParse(sellCtrl.text) ?? item.sellingPrice;
-                item.stock = double.tryParse(stockCtrl.text) ?? item.stock;
-                item.isPending = false;
-                widget.onProductUpdated(item);
-                Navigator.pop(ctx);
-              },
-              child: const Text('Save Details'),
-            ),
-          ],
-        ),
-      ),
-    );
+    _openExactVanikModal(newItem, isNew: true);
   }
 
-  void _addNewLooseItemDialog() {
-    final nameCtrl = TextEditingController();
-    final totalCostCtrl = TextEditingController();
-    final totalKgCtrl = TextEditingController();
-    final sellPriceCtrl = TextEditingController();
-
-    showDialog(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: const Text('Add Loose Commodity (Dal, Chini)', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-        content: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              TextField(controller: nameCtrl, decoration: const InputDecoration(labelText: 'Commodity Name (e.g. Sugar, Chana Dal)', border: OutlineInputBorder())),
-              const SizedBox(height: 8),
-              TextField(controller: totalCostCtrl, keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: 'Total Cost Paid to Distributor (₹)', border: OutlineInputBorder())),
-              const SizedBox(height: 8),
-              TextField(controller: totalKgCtrl, keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: 'Total Quantity Bought (Kg)', border: OutlineInputBorder())),
-              const SizedBox(height: 8),
-              TextField(controller: sellPriceCtrl, keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: 'Selling Rate per Kg (₹)', border: OutlineInputBorder())),
-            ],
-          ),
-        ),
-        actions: [
-          ElevatedButton(
-            style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFFD9822B), foregroundColor: Colors.white, minimumSize: const Size(double.infinity, 44)),
-            onPressed: () {
-              final kg = double.tryParse(totalKgCtrl.text) ?? 1.0;
-              final cost = double.tryParse(totalCostCtrl.text) ?? 0.0;
-              final sell = double.tryParse(sellPriceCtrl.text) ?? 0.0;
-              final unitCost = kg > 0 ? (cost / kg) : 0.0;
-
-              if (nameCtrl.text.trim().isNotEmpty) {
-                final newItem = ProductItem(
-                  id: 'loose_${DateTime.now().millisecondsSinceEpoch}',
-                  name: nameCtrl.text.trim(),
-                  barcode: 'L_${DateTime.now().millisecondsSinceEpoch}',
-                  sellingPrice: sell,
-                  buyingPrice: unitCost,
-                  stock: kg,
-                  type: ItemType.loose,
-                );
-                widget.onProductUpdated(newItem);
-                Navigator.pop(ctx);
-              }
-            },
-            child: const Text('Save Loose Item'),
-          ),
-        ],
-      ),
-    );
-  }
-@override
+  @override
   Widget build(BuildContext context) {
-    final pendingList = widget.inventory.where((p) => p.isPending).toList();
-    final activeList = _activeSubTab == 0 ? widget.inventory : pendingList;
+    final filteredByType = widget.inventory.where((p) => _isLooseMode ? p.type == ItemType.loose : p.type == ItemType.piece).toList();
+    final pendingList = filteredByType.where((p) => p.isPending).toList();
+    final activeList = _activeSubTab == 0 ? filteredByType : pendingList;
 
     return Column(
       children: [
@@ -1170,11 +1274,11 @@ void _openStockEditModal(ProductItem item) {
                     padding: const EdgeInsets.symmetric(vertical: 10),
                     decoration: BoxDecoration(
                       color: _activeSubTab == 0 ? const Color(0xFFD8CBB5) : Colors.white,
-                      borderRadius: BorderRadius.circular(10),
+                      borderRadius: BorderRadius.circular(12),
                       border: Border.all(color: const Color(0xFFD8CBB5)),
                     ),
                     child: Center(
-                      child: Text('Shop items: ${widget.inventory.length}', style: TextStyle(fontWeight: FontWeight.bold, color: _activeSubTab == 0 ? const Color(0xFF4A3E2C) : Colors.black87)),
+                      child: Text('Shop items: ${filteredByType.length}', style: TextStyle(fontWeight: FontWeight.bold, color: _activeSubTab == 0 ? const Color(0xFF4A3E2C) : Colors.black87)),
                     ),
                   ),
                 ),
@@ -1187,7 +1291,7 @@ void _openStockEditModal(ProductItem item) {
                     padding: const EdgeInsets.symmetric(vertical: 10),
                     decoration: BoxDecoration(
                       color: _activeSubTab == 1 ? const Color(0xFFD8CBB5) : Colors.white,
-                      borderRadius: BorderRadius.circular(10),
+                      borderRadius: BorderRadius.circular(12),
                       border: Border.all(color: const Color(0xFFD8CBB5)),
                     ),
                     child: Center(
@@ -1208,53 +1312,60 @@ void _openStockEditModal(ProductItem item) {
                   height: 44,
                   padding: const EdgeInsets.symmetric(horizontal: 12),
                   decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(12), border: Border.all(color: const Color(0xFFE8DFC8))),
-                  child: const Row(
+                  child: Row(
                     children: [
-                      Icon(Icons.search, color: Colors.grey),
-                      SizedBox(width: 8),
-                      Text('Search barcode item', style: TextStyle(color: Colors.grey, fontSize: 14)),
+                      const Icon(Icons.search, color: Colors.grey),
+                      const SizedBox(width: 8),
+                      Text(_isLooseMode ? 'Search loose item' : 'Search barcode item', style: const TextStyle(color: Colors.grey, fontSize: 14)),
                     ],
                   ),
                 ),
               ),
               const SizedBox(width: 8),
               InkWell(
-                onTap: _openStockBarcodeScanner,
+                onTap: () => setState(() => _isLooseMode = false),
                 child: Container(
                   height: 44,
                   width: 44,
-                  decoration: BoxDecoration(color: const Color(0xFFE8DFC8), borderRadius: BorderRadius.circular(12)),
+                  decoration: BoxDecoration(
+                    color: !_isLooseMode ? const Color(0xFFE8DFC8) : Colors.white,
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: const Color(0xFFE8DFC8)),
+                  ),
                   child: const Icon(Icons.qr_code_scanner, color: Color(0xFF2D5A27)),
                 ),
               ),
               const SizedBox(width: 8),
               InkWell(
-                onTap: _addNewLooseItemDialog,
+                onTap: () => setState(() => _isLooseMode = true),
                 child: Container(
                   height: 44,
                   width: 44,
-                  decoration: BoxDecoration(color: const Color(0xFFE8DFC8), borderRadius: BorderRadius.circular(12)),
+                  decoration: BoxDecoration(
+                    color: _isLooseMode ? const Color(0xFFE8DFC8) : Colors.white,
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: const Color(0xFFE8DFC8)),
+                  ),
                   child: const Icon(Icons.scale, color: Color(0xFF2D5A27)),
                 ),
               ),
             ],
           ),
         ),
-        // Vanik Big Orange Button
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
           child: SizedBox(
             width: double.infinity,
-            height: 44,
+            height: 46,
             child: ElevatedButton.icon(
               style: ElevatedButton.styleFrom(
                 backgroundColor: const Color(0xFFD9822B),
                 foregroundColor: Colors.white,
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
               ),
-              onPressed: _openStockBarcodeScanner,
-              icon: const Icon(Icons.qr_code, size: 20),
-              label: const Text('Stock barcode items', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+              onPressed: _isLooseMode ? _openLooseStockFlow : _openBarcodeStockFlow,
+              icon: Icon(_isLooseMode ? Icons.scale : Icons.qr_code, size: 20),
+              label: Text(_isLooseMode ? 'Stock loose item' : 'Stock barcode items', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
             ),
           ),
         ),
@@ -1265,61 +1376,65 @@ void _openStockEditModal(ProductItem item) {
                   child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      Icon(Icons.storefront_outlined, size: 64, color: Colors.grey.shade400),
+                      Icon(_isLooseMode ? Icons.scale_outlined : Icons.storefront_outlined, size: 64, color: Colors.grey.shade400),
                       const SizedBox(height: 8),
-                      const Text('Dukaan me abhi koi samaan nahi hai', style: TextStyle(color: Colors.grey, fontWeight: FontWeight.bold)),
-                      const Text('Upar diye "Stock barcode items" button se maal jodein', style: TextStyle(color: Colors.grey, fontSize: 12)),
+                      Text(_isLooseMode ? 'Dukaan me koi loose item nahi hai' : 'Dukaan me abhi koi barcode samaan nahi hai', style: const TextStyle(color: Colors.grey, fontWeight: FontWeight.bold)),
+                      Text('Upar diye button se ${_isLooseMode ? "loose item" : "barcode maal"} jodein', style: const TextStyle(color: Colors.grey, fontSize: 12)),
                     ],
                   ),
                 )
               : ListView.builder(
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
                   itemCount: activeList.length,
                   itemBuilder: (ctx, i) {
                     final it = activeList[i];
-                    return Container(
-                      margin: const EdgeInsets.only(bottom: 8),
-                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(14),
-                        border: Border.all(color: const Color(0xFFECE7DC)),
-                      ),
-                      child: Row(
-                        children: [
-                          Container(
-                            width: 50,
-                            height: 50,
-                            decoration: BoxDecoration(
-                              color: const Color(0xFFF4F1EA),
-                              borderRadius: BorderRadius.circular(10),
-                              image: it.imagePath.isNotEmpty ? DecorationImage(image: FileImage(File(it.imagePath)), fit: BoxFit.cover) : null,
+                    return InkWell(
+                      onTap: () => _openExactVanikModal(it),
+                      borderRadius: BorderRadius.circular(14),
+                      child: Container(
+                        margin: const EdgeInsets.only(bottom: 8),
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(14),
+                          border: Border.all(color: const Color(0xFFECE7DC)),
+                        ),
+                        child: Row(
+                          children: [
+                            Container(
+                              width: 50,
+                              height: 50,
+                              decoration: BoxDecoration(
+                                color: const Color(0xFFF4F1EA),
+                                borderRadius: BorderRadius.circular(10),
+                                image: it.imagePath.isNotEmpty ? DecorationImage(image: FileImage(File(it.imagePath)), fit: BoxFit.cover) : null,
+                              ),
+                              child: it.imagePath.isEmpty
+                                  ? Icon(it.type == ItemType.loose ? Icons.scale : Icons.inventory_2, color: const Color(0xFF2D5A27))
+                                  : null,
                             ),
-                            child: it.imagePath.isEmpty
-                                ? Icon(it.type == ItemType.loose ? Icons.scale : Icons.inventory_2, color: const Color(0xFF2D5A27))
-                                : null,
-                          ),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(it.name, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
-                                const SizedBox(height: 4),
-                                Text(
-                                  '${it.stock.toStringAsFixed(0)} ${it.type == ItemType.loose ? "kg" : "piece"}',
-                                  style: TextStyle(color: it.stock < 10 ? Colors.red : Colors.grey.shade600, fontSize: 13),
-                                ),
-                              ],
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(it.name, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+                                  const SizedBox(height: 4),
+                                  Text(
+                                    '${it.stock.toStringAsFixed(0)} ${it.type == ItemType.loose ? "kilo" : "piece"}',
+                                    style: TextStyle(color: it.stock < 5 ? Colors.red : Colors.grey.shade600, fontSize: 13),
+                                  ),
+                                ],
+                              ),
                             ),
-                          ),
-                          Text('₹${it.sellingPrice.toStringAsFixed(0)}', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
-                          const SizedBox(width: 6),
-                          IconButton(
-                            icon: const Icon(Icons.edit_outlined, size: 20, color: Color(0xFF2D5A27)),
-                            onPressed: () => _openStockEditModal(it),
-                          ),
-                        ],
+                            Text(
+                              it.type == ItemType.loose ? '₹${it.sellingPrice.toStringAsFixed(0)}/kg' : '₹${it.sellingPrice.toStringAsFixed(0)}',
+                              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
+                            ),
+                            const SizedBox(width: 6),
+                            const Icon(Icons.edit_outlined, size: 20, color: Color(0xFF2D5A27)),
+                          ],
+                        ),
                       ),
                     );
                   },
@@ -1329,17 +1444,18 @@ void _openStockEditModal(ProductItem item) {
     );
   }
 }
-
 // ==========================================
 // 6. SCREEN: MY SALES (VANIK DAILY BAR CHART)
 // ==========================================
 class MySalesScreen extends StatelessWidget {
   final List<SaleRecord> sales;
+  final String shopName;
   final Function(String) onUdhaarCleared;
 
   const MySalesScreen({
     super.key,
     required this.sales,
+    required this.shopName,
     required this.onUdhaarCleared,
   });
 
@@ -1381,7 +1497,6 @@ class MySalesScreen extends StatelessWidget {
                 ],
               ),
               const SizedBox(height: 18),
-              // Daily Bar Graph
               SizedBox(
                 height: 100,
                 child: Row(
@@ -1427,7 +1542,7 @@ class MySalesScreen extends StatelessWidget {
             child: Text('Bills of the day', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: Color(0xFF2D5A27))),
           ),
         ),
-        Expanded(
+       Expanded(
           child: todaySales.isEmpty
               ? const Center(child: Text('No bills created today yet', style: TextStyle(color: Colors.grey)))
               : ListView.builder(
@@ -1450,10 +1565,23 @@ class MySalesScreen extends StatelessWidget {
                         title: Text('₹${s.total.toStringAsFixed(0)} (${s.method.name.toUpperCase()})', style: const TextStyle(fontWeight: FontWeight.bold)),
                         subtitle: Text('${DateFormat('hh:mm a').format(s.date)} ${s.customerPhone.isNotEmpty ? "| Mobile: ${s.customerPhone}" : ""}'),
                         trailing: s.method == PaymentMethod.udhaar
-                            ? ElevatedButton(
-                                style: ElevatedButton.styleFrom(backgroundColor: s.isPaid ? Colors.green : Colors.red, foregroundColor: Colors.white),
-                                onPressed: s.isPaid ? null : () => onUdhaarCleared(s.id),
-                                child: Text(s.isPaid ? 'PAID' : 'COLLECT'),
+                            ? Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  if (s.customerPhone.isNotEmpty)
+                                    IconButton(
+                                      icon: const Icon(Icons.share, color: Colors.green, size: 20),
+                                      onPressed: () {
+                                        final reminder = "Namaste! $shopName se aapka ₹${s.total.toStringAsFixed(0)} ka udhaar baaki hai. Kripya samay par chukta karein.";
+                                        launchUrl(Uri.parse("https://wa.me/91${s.customerPhone}?text=${Uri.encodeComponent(reminder)}"));
+                                      },
+                                    ),
+                                  ElevatedButton(
+                                    style: ElevatedButton.styleFrom(backgroundColor: s.isPaid ? Colors.green : Colors.red, foregroundColor: Colors.white),
+                                    onPressed: s.isPaid ? null : () => onUdhaarCleared(s.id),
+                                    child: Text(s.isPaid ? 'PAID' : 'COLLECT'),
+                                  ),
+                                ],
                               )
                             : null,
                       ),
@@ -1464,4 +1592,4 @@ class MySalesScreen extends StatelessWidget {
       ],
     );
   }
-}
+} 
