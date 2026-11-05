@@ -1021,7 +1021,7 @@ class _MakeBillScreenState extends State<MakeBillScreen> {
                       border: Border.all(color: Colors.black12),
                     ),
                     child: Row(
-                      mainAxisSize:标识: 0,
+                      mainAxisSize: MainAxisSize.min,
                       children: [
                         const CircleAvatar(radius: 10, backgroundColor: Color(0xFFE8DFC8), child: Icon(Icons.person, size: 14, color: Color(0xFF2D5A27))),
                         const SizedBox(width: 6),
