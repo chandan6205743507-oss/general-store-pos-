@@ -2066,17 +2066,13 @@ class _MyShopScreenState extends State<MyShopScreen> {
                             Text('₹${item.sellingPrice.toStringAsFixed(0)}', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
                             const SizedBox(width: 8),
                             IconButton(
-                              icon: const Icon(Icons.edit, color: Color(0xFF2D5A27), size: 18),
-                              onPressed: () => _openStockUpdateDetailModal(item.barcode),
-                            ),
-                          ],
-                        ),
-                      );
-                    },
-                  ),
+                              icon: const Icon(Icons.delete, color: Colors.red),
+                onPressed: () {},
+              ),
+            ],
           ),
-        ],
-      ),
+        ),
+      },
     );
   }
-}
+            }
