@@ -2075,8 +2075,8 @@ class _MyShopScreenState extends State<MyShopScreen> {
       },
     ),
   ),
-],
-),
 );
 }
 }
+          
+                            
