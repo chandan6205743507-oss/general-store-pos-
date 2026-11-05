@@ -16,25 +16,42 @@ void main() async {
 class VanikApp extends StatelessWidget {
   const VanikApp({Key? key}) : super(key: key);
 
-  @override
-  Widget build(BuildContext context) {
-    return MaterialApp(
-      title: 'General Store POS',
-      debugShowCheckedModeBanner: false,
-      theme: ThemeData(
-        scaffoldBackgroundColor: const Color(0xFFFBF8F2),
-        primaryColor: const Color(0xFF2D5A27),
-        colorScheme: ColorScheme.fromSeed(
-          seedColor: const Color(0xFF2D5A27),
-          primary: const Color(0xFF2D5A27),
-          secondary: const Color(0xFFD9822B),
+      @override
+    Widget build(BuildContext context) {
+      return MaterialApp(
+        title: 'General Store POS',
+        debugShowCheckedModeBanner: false,
+        theme: ThemeData(
+          useMaterial3: true,
+          scaffoldBackgroundColor: const Color(0xFFFBF8F2),
+          primaryColor: const Color(0xFF2D5A27),
+          colorScheme: ColorScheme.fromSeed(
+            seedColor: const Color(0xFF2D5A27),
+            primary: const Color(0xFF2D5A27),
+            secondary: const Color(0xFFD9822B),
+            surface: Colors.white,
+          ),
+          cardTheme: CardTheme(
+            color: Colors.white,
+            elevation: 2,
+            shadowColor: Colors.black.withOpacity(0.06),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(16),
+              side: const BorderSide(color: Color(0xFFEBE5D8), width: 1.2),
+            ),
+          ),
+          elevatedButtonTheme: ElevatedButtonThemeData(
+            style: ElevatedButton.styleFrom(
+              elevation: 2,
+              shadowColor: Colors.black.withOpacity(0.15),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+            ),
+          ),
         ),
-      ),
-      home: const MainNavigationScreen(),
-    );
-  }
-}
-
+        home: const MainNavigationScreen(),
+      );
+    }
+  
 // ----------------- DATA MODELS -----------------
 
 class ProductItem {
