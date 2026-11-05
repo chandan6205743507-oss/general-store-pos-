@@ -104,7 +104,7 @@ class SaleRecord {
   String? customerName;
   String? customerPhone;
   bool isPaid;
-  List> itemsSummary;
+  List<dynamic> itemsSummary;
 
   SaleRecord({
     required this.id,
@@ -139,7 +139,9 @@ class SaleRecord {
         customerName: json['customerName'],
         customerPhone: json['customerPhone'],
         isPaid: json['isPaid'] ?? true,
-        itemsSummary: List>.from(json['itemsSummary'] ?? []),
+        itemsSummary: json['itemsSummary'] != null
+            ? List<dynamic>.from(json['itemsSummary'])
+            : <dynamic>[],
       );
 }
 
@@ -501,7 +503,7 @@ class _MakeBillScreenState extends State<MakeBillScreen> {
     _lastScannedCode = code;
     _lastScanTime = now;
 
-    // Beep + Vibrate
+    // Beep + Vibration
     SystemSound.play(SystemSoundType.click);
     HapticFeedback.lightImpact();
 
@@ -1019,7 +1021,7 @@ class _MakeBillScreenState extends State<MakeBillScreen> {
                       border: Border.all(color: Colors.black12),
                     ),
                     child: Row(
-                      mainAxisSize: MainAxisSize.min,
+                      mainAxisSize:标识: 0,
                       children: [
                         const CircleAvatar(radius: 10, backgroundColor: Color(0xFFE8DFC8), child: Icon(Icons.person, size: 14, color: Color(0xFF2D5A27))),
                         const SizedBox(width: 6),
@@ -1129,7 +1131,7 @@ class _MakeBillScreenState extends State<MakeBillScreen> {
               ],
             ),
           ),
-         Expanded(
+          Expanded(
             child: _cart.isEmpty
                 ? const Center(child: Text('Barcode scan karein ya Loose Item jodein', style: TextStyle(color: Colors.black45)))
                 : ListView.builder(
@@ -1301,7 +1303,7 @@ class _MySalesScreenState extends State<MySalesScreen> with SingleTickerProvider
     );
   }
 
-   void _sendWhatsAppReminder(SaleRecord sale) async {
+  void _sendWhatsAppReminder(SaleRecord sale) async {
     final phone = sale.customerPhone ?? '';
     final buffer = StringBuffer();
     buffer.writeln("*Namaste ${sale.customerName} Ji!*");
@@ -1435,7 +1437,7 @@ class _MySalesScreenState extends State<MySalesScreen> with SingleTickerProvider
     );
   }
 
-Widget _buildUdhaarKhataView(List<SaleRecord> udhaarList) {
+  Widget _buildUdhaarKhataView(List<SaleRecord> udhaarList) {
     return Column(
       children: [
         Padding(
