@@ -1898,7 +1898,7 @@ class _MyShopScreenState extends State<MyShopScreen> {
                     child: Container(
                       padding: const EdgeInsets.symmetric(vertical: 10),
                       decoration: BoxDecoration(
-                        color: _selectedTab == 0 ? const Color(0xFFE8DFC8) : Colors.white,
+                        color: _selectedTab == 0 ? const Color(0xFFEADBBE) : Colors.white,
                         borderRadius: BorderRadius.circular(12),
                         border: Border.all(color: Colors.black12),
                       ),
@@ -1920,7 +1920,7 @@ class _MyShopScreenState extends State<MyShopScreen> {
                     child: Container(
                       padding: const EdgeInsets.symmetric(vertical: 10),
                       decoration: BoxDecoration(
-                        color: _selectedTab == 1 ? const Color(0xFFE8DFC8) : Colors.white,
+                        color: _selectedTab == 1 ? const Color(0xFFEADBBE) : Colors.white,
                         borderRadius: BorderRadius.circular(12),
                         border: Border.all(color: Colors.black12),
                       ),
@@ -2003,7 +2003,7 @@ class _MyShopScreenState extends State<MyShopScreen> {
               height: 46,
               child: ElevatedButton.icon(
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFFD9822B),
+                  backgroundColor: const Color(0xFFD97706),
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                   elevation: 0,
                 ),
