@@ -1875,11 +1875,18 @@ class _MyShopScreenState extends State<MyShopScreen> {
                   ),
                 ),
                 const SizedBox(width: 6),
-                const CircleAvatar(radius: 14, backgroundColor: Color(0xFF2D5A27), child: Icon(Icons.check, size: 14, color: Colors.white)),
-              ],
+                GestureDetector(
+                    onTap: _showShopCodeModal,
+                    child: const CircleAvatar(
+                      radius: 14,
+                      backgroundColor: Color(0xFF2D5A27),
+                      child: Icon(Icons.check, size: 14, color: Colors.white),
+                    ),
+                  ),
+                ],
+              ),
             ),
           ),
-
           // 2. Tabs Row: Shop items vs Pending
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 14.0, vertical: 4.0),
