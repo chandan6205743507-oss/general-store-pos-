@@ -239,7 +239,7 @@ class _MakeBillScreenState extends State<MakeBillScreen> {
               style: ElevatedButton.styleFrom(backgroundColor: Colors.green, foregroundColor: Colors.white, minimumSize: const Size(double.infinity, 40)),
               onPressed: () {
                 final text = "Vanik Bill: Total ₹${sale.total.toStringAsFixed(0)} for ${sale.items.length} items.";
-                launchUrl(Uri.parse("https://wa.me/?text=${Uri.encodeComponent(text)}"), mode: LaunchMode.externalApplication);
+                launchUrl(Uri.parse("https://wa.me/?text=${Uri.encodeComponent(text)}"));
               },
               icon: const Icon(Icons.share, size: 18),
               label: const Text('Share on WhatsApp'),
