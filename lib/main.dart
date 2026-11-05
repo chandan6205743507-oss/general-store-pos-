@@ -2065,18 +2065,17 @@ class _MyShopScreenState extends State<MyShopScreen> {
                             ),
                             Text('₹${item.sellingPrice.toStringAsFixed(0)}', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
                             const SizedBox(width: 8),
-                          IconButton(
+                            IconButton(
                 icon: const Icon(Icons.delete, color: Colors.red),
                 onPressed: () {},
               ),
             ],
           ),
-        ),
+        );
       },
     ),
   ),
-],
-),
 );
 }
 }
+          
