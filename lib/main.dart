@@ -51,6 +51,7 @@ class VanikApp extends StatelessWidget {
         home: const MainNavigationScreen(),
       );
     }
+}
   
 // ----------------- DATA MODELS -----------------
 
