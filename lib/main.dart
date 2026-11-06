@@ -775,7 +775,7 @@ class _MyShopScreenEngineState extends State<MyShopScreenEngine> {
   // Loose Item Addition Modal (Kilo vs Piece Switch)
   void _openAddLooseItemDialog() {
     String unitMode = 'kilo';
-    bool pickedPhoto = false;
+    File? pickedPhotoFile;
     final nameInput = TextEditingController();
     final wholeStockMoneyInput = TextEditingController();
     final quantityBoughtInput = TextEditingController();
@@ -805,43 +805,44 @@ class _MyShopScreenEngineState extends State<MyShopScreenEngine> {
                   children: [
                     Column(
                       children: [
-                        // Photo Picker Box
-                        GestureDetector(
-                onTap: () {
-                  setDialogState(() {
-                    pickedPhoto = true;
-                  });
+                        // Photo Picker Box (Live Camera)
+              GestureDetector(
+                onTap: () async {
+                  final picker = ImagePicker();
+                  final picked = await picker.pickImage(
+                    source: ImageSource.camera,
+                    imageQuality: 60,
+                  );
+                  if (picked != null) {
+                    setDialogState(() {
+                      pickedPhotoFile = File(picked.path);
+                    });
+                  }
                 },
                 child: Container(
                   width: 80,
                   height: 60,
                   decoration: BoxDecoration(
-                    color: pickedPhoto ? const Color(0xFFE8F5E9) : const Color(0xFFF1EBDD),
+                    color: const Color(0xFFF1EBDD),
                     borderRadius: BorderRadius.circular(12),
                     border: Border.all(
-                      color: pickedPhoto ? Colors.green : const Color(0xFF3B5C35).withOpacity(0.4),
+                      color: pickedPhotoFile != null ? Colors.green : const Color(0xFF3B5C35).withOpacity(0.4),
                       width: 1.5,
                     ),
                   ),
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Icon(
-                        pickedPhoto ? Icons.check_circle : Icons.add_a_photo,
-                        color: pickedPhoto ? Colors.green : const Color(0xFF3B5C35),
-                        size: 24,
-                      ),
-                      const SizedBox(height: 2),
-                      Text(
-                        pickedPhoto ? 'Photo OK' : 'Photo',
-                        style: TextStyle(
-                          fontSize: 10,
-                          color: pickedPhoto ? Colors.green : const Color(0xFF3B5C35),
-                          fontWeight: FontWeight.bold,
+                  child: pickedPhotoFile != null
+                      ? ClipRRect(
+                          borderRadius: BorderRadius.circular(10),
+                          child: Image.file(pickedPhotoFile!, fit: BoxFit.cover),
+                        )
+                      : const Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(Icons.add_a_photo, color: Color(0xFF3B5C35), size: 24),
+                            SizedBox(height: 2),
+                            Text('Photo', style: TextStyle(fontSize: 10, color: Color(0xFF3B5C35), fontWeight: FontWeight.bold)),
+                          ],
                         ),
-                      ),
-                    ],
-                  ),
                 ),
               ),
                         const SizedBox(height: 6),
@@ -2282,6 +2283,7 @@ class _BarcodeStockScannerScreenState extends State<BarcodeStockScannerScreen> {
   }
 
   void _showAddStockSheet(ProductEntity item) {
+    File? itemPhotoFile;
     final moneyCtrl = TextEditingController();
     final piecesCtrl = TextEditingController();
     final sellRateCtrl = TextEditingController(text: item.sellPrice.toInt().toString());
@@ -2291,7 +2293,8 @@ class _BarcodeStockScannerScreenState extends State<BarcodeStockScannerScreen> {
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
-      builder: (ctx) => Container(
+      builder: (ctx) => StatefulBuilder(
+        builder: (context, setSheetState) => Container(
         padding: EdgeInsets.only(
           top: 20,
           left: 18,
@@ -2309,15 +2312,46 @@ class _BarcodeStockScannerScreenState extends State<BarcodeStockScannerScreen> {
               Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Container(
+                  // Barcode Item Photo Box (Click karne par camera khulega)
+                GestureDetector(
+                  onTap: () async {
+                    final picker = ImagePicker();
+                    final picked = await picker.pickImage(
+                      source: ImageSource.camera,
+                      imageQuality: 60,
+                    );
+                    if (picked != null) {
+                      setSheetState(() {
+                        itemPhotoFile = File(picked.path);
+                      });
+                    }
+                  },
+                  child: Container(
                     width: 76,
                     height: 76,
                     decoration: BoxDecoration(
                       color: const Color(0xFFF1EBDD),
                       borderRadius: BorderRadius.circular(12),
+                      border: Border.all(
+                        color: itemPhotoFile != null ? Colors.green : const Color(0xFFD48B38).withOpacity(0.4),
+                        width: 1.5,
+                      ),
                     ),
-                    child: const Icon(Icons.inventory_2_outlined, color: Color(0xFFD48B38), size: 36),
+                    child: itemPhotoFile != null
+                        ? ClipRRect(
+                            borderRadius: BorderRadius.circular(12),
+                            child: Image.file(itemPhotoFile!, fit: BoxFit.cover),
+                          )
+                        : const Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(Icons.add_a_photo, color: Color(0xFFD48B38), size: 28),
+                              SizedBox(height: 4),
+                              Text('Add Photo', style: TextStyle(fontSize: 10, color: Color(0xFFD48B38), fontWeight: FontWeight.bold)),
+                            ],
+                          ),
                   ),
+                ),
                   const SizedBox(width: 14),
                   Expanded(
                     child: Column(
@@ -2359,15 +2393,16 @@ class _BarcodeStockScannerScreenState extends State<BarcodeStockScannerScreen> {
                     widget.onStockAdded(item, money, pieces, sellPrice);
                     Navigator.pop(ctx);
                   },
-                  child: const Text('Add stock', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16)),
+                  child: const Text('Add stock', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
         ),
-      ),
-    );
-  }
+     ),
+   );
+   }
+              
 
   Widget _buildInputField(String label, TextEditingController ctrl) {
     return Container(
