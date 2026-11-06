@@ -294,17 +294,16 @@ class _OnboardingFlowManagerState extends State<OnboardingFlowManager> {
                   // Step 1: OTP Screen
                   else if (_onboardingStep == 1) ...[
                     TextField(
-                      controller: _otpCtrl,
-                      keyboardType: TextInputType.number,
-                      textAlign: TextAlign.center,
-                      letterSpacing: 6,
-                      style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
-                      decoration: InputDecoration(
-                        labelText: '4-Digit OTP Dalein',
-                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-                      ),
+                    controller: _otpCtrl,
+                    keyboardType: TextInputType.number,
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold, letterSpacing: 6),
+                    decoration: InputDecoration(
+                      labelText: '4-Digit OTP Dalein',
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
                     ),
-                    const SizedBox(height: 20),
+                  ),
+                  const SizedBox(height: 20),
                     SizedBox(
                       width: double.infinity,
                       height: 48,
