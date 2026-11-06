@@ -2395,16 +2395,14 @@ class _BarcodeStockScannerScreenState extends State<BarcodeStockScannerScreen> {
                     Navigator.pop(ctx);
                   },
                   child: const Text('Add stock', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
-                ),
-              ],
-            ),
-          ),
-        ),
+             ),
+           ),
+         ],
+       ),
      ),
-   );
-   }
-              
-
+   ),
+ );
+ }                         
   Widget _buildInputField(String label, TextEditingController ctrl) {
     return Container(
       margin: const EdgeInsets.only(bottom: 10),
