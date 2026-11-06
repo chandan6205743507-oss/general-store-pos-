@@ -133,7 +133,7 @@ class VanikCompleteMasterApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'Vanik Kirana Engine',
+      title: 'General Store',
       debugShowCheckedModeBanner: false,
       theme: ThemeData(
         scaffoldBackgroundColor: VanikTheme.scaffoldBg,
@@ -269,7 +269,7 @@ class _OnboardingFlowManagerState extends State<OnboardingFlowManager> {
                   if (_onboardingStep == 0) ...[
                     TextField(
                       controller: _mobilePhoneCtrl,
-                      keyboardType: TextInputType.phone,
+                      keyboardType: TextInputType.text,
                       decoration: InputDecoration(
                         prefixIcon: const Icon(Icons.phone_android, color: VanikTheme.darkMustard),
                         labelText: 'Mobile Number',
@@ -321,6 +321,7 @@ class _OnboardingFlowManagerState extends State<OnboardingFlowManager> {
                   else if (_onboardingStep == 2) ...[
                     TextField(
                       controller: _storeNameCtrl,
+                      keyboardType: TextInputType.text,
                       decoration: InputDecoration(
                         prefixIcon: const Icon(Icons.store, color: VanikTheme.darkGreen),
                         labelText: 'Apni Dukan Ka Naam',
