@@ -41,7 +41,7 @@ class ShopSession {
   ShopSession({
     this.ownerPhone = '',
     this.shopName = '',
-    this.joiningCode = '765177',
+    this.joiningCode = '',
     this.language = 'English',
     this.isLoggedIn = false,
   });
@@ -186,6 +186,7 @@ class _OnboardingFlowManagerState extends State<OnboardingFlowManager> {
     if (_storeNameCtrl.text.trim().isNotEmpty) {
       setState(() {
         _session.shopName = _storeNameCtrl.text.trim();
+        _session.joiningCode = (100000 + DateTime.now().millisecondsSinceEpoch % 900000).toString();
         _session.isLoggedIn = true;
         _onboardingStep = 3;
       });
@@ -774,6 +775,7 @@ class _MyShopScreenEngineState extends State<MyShopScreenEngine> {
   // Loose Item Addition Modal (Kilo vs Piece Switch)
   void _openAddLooseItemDialog() {
     String unitMode = 'kilo';
+    bool pickedPhoto = false;
     final nameInput = TextEditingController();
     final wholeStockMoneyInput = TextEditingController();
     final quantityBoughtInput = TextEditingController();
@@ -805,27 +807,43 @@ class _MyShopScreenEngineState extends State<MyShopScreenEngine> {
                       children: [
                         // Photo Picker Box
                         GestureDetector(
-                          onTap: () {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(content: Text('Camera se item photo li gayi!')),
-                            );
-                          },
-                          child: Container(
-                            width: 80, height: 60,
-                            decoration: BoxDecoration(
-                              color: const Color(0xFFF1EBDD),
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                            child: const Column(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                Icon(Icons.add_a_photo, color: Color(0xFF3B5C35), size: 24),
-                                SizedBox(height: 2),
-                                Text('Photo', style: TextStyle(fontSize: 10, color: Color(0xFF3B5C35), fontWeight: FontWeight.bold)),
-                              ],
-                            ),
-                          ),
+                onTap: () {
+                  setDialogState(() {
+                    pickedPhoto = true;
+                  });
+                },
+                child: Container(
+                  width: 80,
+                  height: 60,
+                  decoration: BoxDecoration(
+                    color: pickedPhoto ? const Color(0xFFE8F5E9) : const Color(0xFFF1EBDD),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(
+                      color: pickedPhoto ? Colors.green : const Color(0xFF3B5C35).withOpacity(0.4),
+                      width: 1.5,
+                    ),
+                  ),
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(
+                        pickedPhoto ? Icons.check_circle : Icons.add_a_photo,
+                        color: pickedPhoto ? Colors.green : const Color(0xFF3B5C35),
+                        size: 24,
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        pickedPhoto ? 'Photo OK' : 'Photo',
+                        style: TextStyle(
+                          fontSize: 10,
+                          color: pickedPhoto ? Colors.green : const Color(0xFF3B5C35),
+                          fontWeight: FontWeight.bold,
                         ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
                         const SizedBox(height: 6),
                         // Segmented Kilo vs Piece Switch
                         Container(
@@ -1268,12 +1286,29 @@ class _MyShopScreenEngineState extends State<MyShopScreenEngine> {
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
           child: GestureDetector(
             onTap: () {
-              if (_categoryIndex == 0) {
-                _openStockBarcodeItemDialog();
-              } else {
-                _openAddLooseItemDialog();
-              }
-            },
+          if (_categoryIndex == 0) {
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (ctx) => BarcodeStockScannerScreen(
+                  catalog: widget.catalog,
+                  onStockAdded: (product, wholeCost, pieces, sellPrice) {
+                    setState(() {
+                      product.buyPrice = wholeCost > 0 && pieces > 0 ? wholeCost / pieces : product.buyPrice;
+                      product.stock += pieces;
+                      product.sellPrice = sellPrice;
+                    });
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(content: Text('${product.name} ka stock jud gaya!')),
+                    );
+                  },
+                ),
+              ),
+            );
+          } else {
+            _openAddLooseItemDialog();
+          }
+        },
             child: Container(
               height: 46, width: double.infinity,
               decoration: BoxDecoration(color: VanikTheme.darkMustard, borderRadius: BorderRadius.circular(12)),
@@ -2212,6 +2247,289 @@ class _MySalesScreenEngineState extends State<MySalesScreenEngine> {
         const SizedBox(height: 6),
         Text(dayLabel, style: const TextStyle(fontSize: 10, color: Colors.black54)),
       ],
+    );
+  }
+}
+// ============================================================================
+// SCAN BARCODE FOR STOCKING (LIVE CAMERA + ADD STOCK MODAL)
+// ============================================================================
+class BarcodeStockScannerScreen extends StatefulWidget {
+  final List<ProductEntity> catalog;
+  final Function(ProductEntity, double, int, double) onStockAdded;
+
+  const BarcodeStockScannerScreen({
+    super.key,
+    required this.catalog,
+    required this.onStockAdded,
+  });
+
+  @override
+  State<BarcodeStockScannerScreen> createState() => _BarcodeStockScannerScreenState();
+}
+
+class _BarcodeStockScannerScreenState extends State<BarcodeStockScannerScreen> {
+  final MobileScannerController _scannerCtrl = MobileScannerController(
+    detectionSpeed: DetectionSpeed.noDuplicates,
+    facing: CameraFacing.back,
+  );
+  bool _torch = false;
+  String _searchFilter = '';
+
+  @override
+  void dispose() {
+    _scannerCtrl.dispose();
+    super.dispose();
+  }
+
+  void _showAddStockSheet(ProductEntity item) {
+    final moneyCtrl = TextEditingController();
+    final piecesCtrl = TextEditingController();
+    final sellRateCtrl = TextEditingController(text: item.sellPrice.toInt().toString());
+    final currentPiecesCtrl = TextEditingController(text: item.stock.toInt().toString());
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => Container(
+        padding: EdgeInsets.only(
+          top: 20,
+          left: 18,
+          right: 18,
+          bottom: MediaQuery.of(ctx).viewInsets.bottom + 20,
+        ),
+        decoration: const BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+        ),
+        child: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Container(
+                    width: 76,
+                    height: 76,
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFF1EBDD),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: const Icon(Icons.inventory_2_outlined, color: Color(0xFFD48B38), size: 36),
+                  ),
+                  const SizedBox(width: 14),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(item.barcode ?? '', style: const TextStyle(color: Colors.grey, fontSize: 13, fontWeight: FontWeight.bold)),
+                        const SizedBox(height: 4),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFFAF6EE),
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          child: Text(item.name, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 16),
+              _buildInputField('Money you paid for whole stock (₹)', moneyCtrl),
+              _buildInputField('No. of pieces bought in that money', piecesCtrl),
+              _buildInputField('Selling price of single unit (₹)', sellRateCtrl),
+              _buildInputField('Current pieces in shop', currentPiecesCtrl),
+              const SizedBox(height: 16),
+              SizedBox(
+                width: double.infinity,
+                height: 48,
+                child: ElevatedButton(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFFD48B38),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  ),
+                  onPressed: () {
+                    final money = double.tryParse(moneyCtrl.text) ?? 0.0;
+                    final pieces = int.tryParse(piecesCtrl.text) ?? 0;
+                    final sellPrice = double.tryParse(sellRateCtrl.text) ?? item.sellPrice;
+                    widget.onStockAdded(item, money, pieces, sellPrice);
+                    Navigator.pop(ctx);
+                  },
+                  child: const Text('Add stock', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16)),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildInputField(String label, TextEditingController ctrl) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 10),
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: const Color(0xFFE2DAC8)),
+      ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Expanded(child: Text(label, style: const TextStyle(color: Colors.black87, fontSize: 13))),
+          SizedBox(
+            width: 70,
+            child: TextField(
+              controller: ctrl,
+              keyboardType: TextInputType.number,
+              textAlign: TextAlign.center,
+              decoration: const InputDecoration(border: InputBorder.none, hintText: '00'),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final filtered = widget.catalog
+        .where((p) => !p.isLoose && p.name.toLowerCase().contains(_searchFilter.toLowerCase()))
+        .toList();
+
+    return Scaffold(
+      backgroundColor: const Color(0xFFFBF8F2),
+      appBar: AppBar(
+        backgroundColor: Colors.black87,
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back_ios, color: Colors.white, size: 20),
+          onPressed: () => Navigator.pop(context),
+        ),
+        title: const Text('Scan Barcode', style: TextStyle(color: Colors.white, fontSize: 16)),
+        centerTitle: true,
+        actions: [
+          IconButton(
+            icon: Icon(_torch ? Icons.flash_on : Icons.flash_off, color: Colors.white),
+            onPressed: () {
+              _scannerCtrl.toggleTorch();
+              setState(() => _torch = !_torch);
+            },
+          ),
+        ],
+      ),
+      body: Column(
+        children: [
+          SizedBox(
+            height: 220,
+            width: double.infinity,
+            child: Stack(
+              children: [
+                MobileScanner(
+                  controller: _scannerCtrl,
+                  onDetect: (capture) {
+                    for (final b in capture.barcodes) {
+                      if (b.rawValue != null && b.rawValue!.isNotEmpty) {
+                        HapticFeedback.mediumImpact();
+                        final code = b.rawValue!;
+                        final matched = widget.catalog.where((p) => p.barcode == code).toList();
+                        if (matched.isNotEmpty) {
+                          _showAddStockSheet(matched.first);
+                        } else {
+                          final newItem = ProductEntity(
+                            id: DateTime.now().millisecondsSinceEpoch.toString(),
+                            name: 'Item $code',
+                            barcode: code,
+                            buyPrice: 0.0,
+                            sellPrice: 10.0,
+                            stock: 0,
+                            unit: 'piece',
+                          );
+                          widget.catalog.add(newItem);
+                          _showAddStockSheet(newItem);
+                        }
+                        break;
+                      }
+                    }
+                  },
+                ),
+                Center(
+                  child: Container(
+                    width: 250,
+                    height: 120,
+                    decoration: BoxDecoration(
+                      border: Border.all(color: const Color(0xFFF59E0B), width: 2),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.all(12),
+            child: Container(
+              height: 48,
+              padding: const EdgeInsets.symmetric(horizontal: 14),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: const Color(0xFFE2DAC8)),
+              ),
+              child: Row(
+                children: [
+                  const Icon(Icons.search, color: Colors.grey, size: 22),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: TextField(
+                      onChanged: (v) => setState(() => _searchFilter = v),
+                      decoration: const InputDecoration(
+                        border: InputBorder.none,
+                        hintText: 'Search barcode item',
+                        hintStyle: TextStyle(color: Colors.grey),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          Expanded(
+            child: ListView.builder(
+              itemCount: filtered.length,
+              itemBuilder: (ctx, i) {
+                final p = filtered[i];
+                return Container(
+                  margin: const EdgeInsets.symmetric(horizontal: 14, vertical: 5),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: const Color(0xFFEFEAE1)),
+                  ),
+                  child: ListTile(
+                    leading: Container(
+                      width: 46,
+                      height: 46,
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFF1EBDD),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: const Icon(Icons.inventory_2_outlined, color: Color(0xFFD48B38)),
+                    ),
+                    title: Text(p.name, style: const TextStyle(fontWeight: FontWeight.bold)),
+                    subtitle: Text('Selling Price: ₹${p.sellPrice.toInt()}'),
+                    onTap: () => _showAddStockSheet(p),
+                  ),
+                );
+              },
+            ),
+          ),
+        ],
+      ),
     );
   }
 }
