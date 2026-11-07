@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "775528886106",
+    "project_id": "general-store-pos-6677d",
+    "storage_bucket": "general-store-pos-6677d.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:775528886106:android:6a4b5625ed0e45d8b68d63",
+        "android_client_info": {
+          "package_name": "com.generalstore.pos.general_store_pos"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCU-pPMY5jDFToTL7Ajn5Cm0sVh1hdfFW8"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
