@@ -2294,8 +2294,10 @@ class _BarcodeStockScannerScreenState extends State<BarcodeStockScannerScreen> {
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
-      builder: (ctx) => StatefulBuilder(
-        builder: (context, setSheetState) => Container(
+      builder: (ctx) {
+      return StatefulBuilder(
+        builder: (context, setSheetState) {
+          return Container(
         padding: EdgeInsets.only(
           top: 20,
           left: 18,
@@ -2400,9 +2402,13 @@ class _BarcodeStockScannerScreenState extends State<BarcodeStockScannerScreen> {
          ],
        ),
      ),
-   ),
- );
- }                         
+           );
+          },
+        );
+      },
+    );
+    }
+ 
   Widget _buildInputField(String label, TextEditingController ctrl) {
     return Container(
       margin: const EdgeInsets.only(bottom: 10),
