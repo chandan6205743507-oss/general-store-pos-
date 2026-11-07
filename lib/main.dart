@@ -2296,6 +2296,7 @@ class _BarcodeStockScannerScreenState extends State<BarcodeStockScannerScreen> {
     facing: CameraFacing.back,
   );
   bool _torch = false;
+  bool _isStockScanning = false;
   String _searchFilter = '';
 
   @override
@@ -2493,14 +2494,24 @@ class _BarcodeStockScannerScreenState extends State<BarcodeStockScannerScreen> {
                 MobileScanner(
                   controller: _scannerCtrl,
                   onDetect: (capture) {
-                    for (final b in capture.barcodes) {
-                      if (b.rawValue != null && b.rawValue!.isNotEmpty) {
-                        HapticFeedback.mediumImpact();
-                        final code = b.rawValue!;
-                        final matched = widget.catalog.where((p) => p.barcode == code).toList();
-                        if (matched.isNotEmpty) {
-                          _showAddStockSheet(matched.first);
-                        } else {
+  if (_isStockScanning) return;
+  for (final b in capture.barcodes) {
+    if (b.rawValue != null && b.rawValue!.isNotEmpty) {
+      _isStockScanning = true;
+      HapticFeedback.mediumImpact();
+      final code = b.rawValue!;
+      final matched = widget.catalog.where((item) => item.barcode == code);
+      if (matched.isNotEmpty) {
+        setState(() {
+          matched.first.stock += 1;
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('${matched.first.name}: Stock +1 ho gaya! (Kul: ${matched.first.stock})'),
+            duration: const Duration(milliseconds: 900),
+          ),
+        );
+      } else {
                           final newItem = ProductEntity(
                             id: DateTime.now().millisecondsSinceEpoch.toString(),
                             name: 'Item $code',
@@ -2511,11 +2522,18 @@ class _BarcodeStockScannerScreenState extends State<BarcodeStockScannerScreen> {
                             unit: 'piece',
                           );
                           widget.catalog.add(newItem);
-                          _showAddStockSheet(newItem);
+                          ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text('Naya item jud gaya: ${newItem.name}'),
+                  duration: const Duration(milliseconds: 900),
+                ),
+              );
                         }
                         break;
                       }
-                    }
+                     Future.delayed(const Duration(milliseconds: 1200), () {
+        if (mounted) setState(() => _isStockScanning = false);
+      });
                   },
                 ),
                 Center(
