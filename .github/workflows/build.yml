@@ -44,12 +44,9 @@ jobs:
 
       - name: Set Android Camera & Min SDK
         run: |
-          sed -i 's/minSdkVersion = flutter.minSdkVersion/minSdkVersion = 21/g' android/app/build.gradle
-          sed -i 's/minSdk = flutter.minSdk/minSdk = 21/g' android/app/build.gradle
-          sed -i 's/minSdkVersion 16/minSdkVersion 21/g' android/app/build.gradle
-          sed -i 's/minSdkVersion 19/minSdkVersion 21/g' android/app/build.gradle
-          sed -i 's/<application/<uses-permission android:name="android.permission.CAMERA"\/>\n    <application/g' android/app/src/main/AndroidManifest.xml
-
+          sed -i 's/minSdkVersion flutter.minSdkVersion/minSdkVersion 21/g' android/app/build.gradle || true
+          sed -i 's/minSdk = flutter.minSdkVersion/minSdk = 21/g' android/app/build.gradle || true
+          sed -i 's/<application/<uses-permission android:name="android.permission.CAMERA" \/>\n    <application/' android/app/src/main/AndroidManifest.xml || true
       - name: Install dependencies
         run: flutter pub get
 
