@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
 import 'dart:io';
 import 'package:image_picker/image_picker.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
   SystemChrome.setPreferredOrientations([
@@ -164,36 +165,56 @@ class _OnboardingFlowManagerState extends State<OnboardingFlowManager> {
   final TextEditingController _otpCtrl = TextEditingController(text: '1234');
   final TextEditingController _storeNameCtrl = TextEditingController();
 
-  void _proceedToOtp() {
+  @override
+  void initState() {
+    super.initState();
+    _checkSavedLogin();
+  }
+
+  Future<void> _checkSavedLogin() async {
+    final prefs = await SharedPreferences.getInstance();
+    final bool loggedIn = prefs.getBool('isLoggedIn') ?? false;
+    if (loggedIn) {
+      final String shop = prefs.getString('savedShopName') ?? 'General Store';
+      final String phone = prefs.getString('savedPhone') ?? '';
+      setState(() {
+        _session.shopName = shop;
+        _session.ownerPhone = phone;
+        _session.isLoggedIn = true;
+        _onboardingStep = 3;
+      });
+    }
+  }
+  void _proceedToShopName() {
     if (_mobilePhoneCtrl.text.trim().length >= 10) {
       setState(() {
         _session.ownerPhone = _mobilePhoneCtrl.text.trim();
-        _onboardingStep = 1;
+        _onboardingStep = 2;
       });
     } else {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Kripya 10 anko ka valid mobile number dalein!')),
+        const SnackBar(content: Text('Kripya sahi 10 digit mobile number dalein')),
       );
     }
   }
 
-  void _verifyOtp() {
-    setState(() {
-      _onboardingStep = 2;
-    });
-  }
-
-  void _completeShopSetup() {
+  void _completeShopSetup() async {
     if (_storeNameCtrl.text.trim().isNotEmpty) {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setBool('isLoggedIn', true);
+      await prefs.setString('savedShopName', _storeNameCtrl.text.trim());
+      await prefs.setString('savedPhone', _mobilePhoneCtrl.text.trim());
+
       setState(() {
         _session.shopName = _storeNameCtrl.text.trim();
-        _session.joiningCode = (100000 + DateTime.now().millisecondsSinceEpoch % 900000).toString();
+        _session.ownerPhone = _mobilePhoneCtrl.text.trim();
+        _session.joiningCode = (100000 + (DateTime.now().millisecondsSinceEpoch % 900000)).toString();
         _session.isLoggedIn = true;
         _onboardingStep = 3;
       });
     } else {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Dukan ka naam likhna anivarya hai!')),
+        const SnackBar(content: Text('Dukan ka naam likhna zaroori hai!')),
       );
     }
   }
@@ -249,7 +270,7 @@ class _OnboardingFlowManagerState extends State<OnboardingFlowManager> {
                   ),
                   const SizedBox(height: 16),
                   const Text(
-                    'Vanik Kirana POS',
+                    'General Store POS',
                     style: TextStyle(
                       fontSize: 22,
                       fontWeight: FontWeight.bold,
