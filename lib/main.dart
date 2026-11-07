@@ -2572,25 +2572,22 @@ class _BarcodeStockScannerScreenState extends State<BarcodeStockScannerScreen> {
                     border: Border.all(color: const Color(0xFFEFEAE1)),
                   ),
                   child: ListTile(
-                    leading: Container(
-                      width: 46,
-                      height: 46,
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFF1EBDD),
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: const Icon(Icons.inventory_2_outlined, color: Color(0xFFD48B38)),
-                    ),
-                    title: Text(p.name, style: const TextStyle(fontWeight: FontWeight.bold)),
-                    subtitle: Text('Selling Price: ₹${p.sellPrice.toInt()}'),
-                    onTap: () => _showAddStockSheet(p),
+                    leading: (p.imagePath != null && p.imagePath!.isNotEmpty && File(p.imagePath!).existsSync())
+              ? ClipRRect(
+                  borderRadius: BorderRadius.circular(8),
+                  child: Image.file(
+                    File(p.imagePath!),
+                    width: 46,
+                    height: 46,
+                    fit: BoxFit.cover,
                   ),
-                );
-              },
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
+                )
+              : Container(
+                  width: 46,
+                  height: 46,
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFE8F5E9),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: const Icon(Icons.inventory_2_outlined, color: Color(0xFF2E7D32)),
+                ),
