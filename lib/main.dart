@@ -2532,10 +2532,14 @@ class _BarcodeStockScannerScreenState extends State<BarcodeStockScannerScreen> {
                         break;
                       }
                      Future.delayed(const Duration(milliseconds: 1200), () {
-        if (mounted) setState(() => _isStockScanning = false);
-      });
-                  },
-                ),
+              if (mounted) {
+                setState(() {
+                  _isStockScanning = false;
+                });
+              }
+            });
+          },
+        ),
                 Center(
                   child: Container(
                     width: 250,
@@ -2590,16 +2594,15 @@ class _BarcodeStockScannerScreenState extends State<BarcodeStockScannerScreen> {
                     border: Border.all(color: const Color(0xFFEFEAE1)),
                   ),
                   child: ListTile(
-                    leading: (p.imagePath != null && p.imagePath!.isNotEmpty && File(p.imagePath!).existsSync())
-              ? ClipRRect(
-                  borderRadius: BorderRadius.circular(8),
-                  child: Image.file(
-                    File(p.imagePath!),
-                    width: 46,
-                    height: 46,
-                    fit: BoxFit.cover,
-                  ),
-                )
+                        leading: Container(
+                          width: 46,
+                          height: 46,
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFE8F5E9),
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          child: const Icon(Icons.inventory_2_outlined, color: Color(0xFF2E7D32)),
+                        ),
               : Container(
                   width: 46,
                   height: 46,
