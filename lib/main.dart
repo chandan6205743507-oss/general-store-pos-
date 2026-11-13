@@ -2603,12 +2603,4 @@ class _BarcodeStockScannerScreenState extends State<BarcodeStockScannerScreen> {
                           ),
                           child: const Icon(Icons.inventory_2_outlined, color: Color(0xFF2E7D32)),
                         ),
-              : Container(
-                  width: 46,
-                  height: 46,
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFE8F5E9),
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: const Icon(Icons.inventory_2_outlined, color: Color(0xFF2E7D32)),
-                ),
+              
