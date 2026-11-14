@@ -3009,7 +3009,7 @@ class _StockBarcodeScreenState extends State<StockBarcodeScreen> {
 class StockLooseItemScreen extends StatefulWidget {
   final List<ProductItem> looseProducts;
   final Future<void> Function(ProductItem) onSaveProduct;
-  final Future> Function(ImageSource) onPickImage;
+  final Future Function(ImageSource) onPickImage;
   const StockLooseItemScreen({
     super.key,
     required this.looseProducts,
