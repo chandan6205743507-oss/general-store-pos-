@@ -5543,6 +5543,7 @@ class _MyProfileScreenState extends State<MyProfileScreen> {
                   const SizedBox(width: 8),
                   ElevatedButton(
                     onPressed: () async {
+                      FocusScope.of(context).unfocus();
                       await widget.onSaveUpi(_upiCtrl.text.trim());
                       if (mounted) {
                         ScaffoldMessenger.of(context).showSnackBar(
