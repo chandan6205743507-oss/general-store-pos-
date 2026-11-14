@@ -175,7 +175,7 @@ class BillRecord {
         customerPhone: m['customerPhone'] ?? '',
         totalAmount: (m['totalAmount'] ?? 0).toDouble(),
         totalProfit: (m['totalProfit'] ?? 0).toDouble(),
-        items: List>.from(m['items'] ?? []),
+        items: List.from(m['items'] ?? []),
       );
 }
 
@@ -211,7 +211,7 @@ class UdhaarEntry {
         isPayment: m['isPayment'] ?? false,
         amount: (m['amount'] ?? 0).toDouble(),
         note: m['note'] ?? '',
-        items: List>.from(m['items'] ?? []),
+        items: List.from(m['items'] ?? []),
       );
 }
 
@@ -1850,7 +1850,7 @@ class _MainPosHomeScreenState extends State<MainPosHomeScreen> {
                     borderRadius: BorderRadius.circular(16),
                     boxShadow: [
                       BoxShadow(
-                        color: AppColors.primaryGreen.withValues(alpha: 0.35),
+                        color: AppColors.primaryGreen.withOpacity(0.35),
                         blurRadius: 8,
                         offset: const Offset(0, 3),
                       ),
@@ -1973,7 +1973,7 @@ class MyShopTab extends StatefulWidget {
   final bool firebaseReady;
   final Future<void> Function(ProductItem) onSaveProduct;
   final Future<void> Function(String) onDeleteProduct;
-  final Future> Function(ImageSource) onPickImage;
+  final Future Function(ImageSource) onPickImage;
   const MyShopTab({
     super.key,
     required this.products,
@@ -2524,7 +2524,7 @@ class _MyShopTabState extends State<MyShopTab> {
 
 class _PendingItemCard extends StatefulWidget {
   final ProductItem item;
-  final Future> Function(ImageSource) onPickImage;
+  final Future Function(ImageSource) onPickImage;
   final Future<void> Function(ProductItem) onSave;
 
   const _PendingItemCard({
@@ -2667,7 +2667,7 @@ class StockBarcodeScreen extends StatefulWidget {
   final List<ProductItem> products;
   final bool firebaseReady;
   final Future<void> Function(ProductItem) onSaveProduct;
-  final Future> Function(ImageSource) onPickImage;
+  final Future Function(ImageSource) onPickImage;
   const StockBarcodeScreen({
     super.key,
     required this.products,
@@ -3352,7 +3352,7 @@ class MakeBillScreen extends StatefulWidget {
   final List<ProductItem> products;
   final List<UdhaarCustomer> customers;
   final Future<void> Function(ProductItem) onSaveNewProduct;
-  final Future> Function(ImageSource) onPickImage;
+  final Future Function(ImageSource) onPickImage;
   final Future<void> Function(UdhaarCustomer) onSaveCustomer;
   final Future<void> Function(BillRecord, List<CartItem>) onCompleteBill;
 
