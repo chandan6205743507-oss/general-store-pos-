@@ -1973,7 +1973,7 @@ class MyShopTab extends StatefulWidget {
   final bool firebaseReady;
   final Future<void> Function(ProductItem) onSaveProduct;
   final Future<void> Function(String) onDeleteProduct;
-  final Future<String?> Function(ImageSource) onPickImage;
+  final Future> Function(ImageSource) onPickImage;
   const MyShopTab({
     super.key,
     required this.products,
@@ -2524,7 +2524,7 @@ class _MyShopTabState extends State<MyShopTab> {
 
 class _PendingItemCard extends StatefulWidget {
   final ProductItem item;
-  final Future<String?> Function(ImageSource) onPickImage;
+  final Future> Function(ImageSource) onPickImage;
   final Future<void> Function(ProductItem) onSave;
 
   const _PendingItemCard({
@@ -2667,7 +2667,7 @@ class StockBarcodeScreen extends StatefulWidget {
   final List<ProductItem> products;
   final bool firebaseReady;
   final Future<void> Function(ProductItem) onSaveProduct;
-  final Future<String?> Function(ImageSource) onPickImage;
+  final Future> Function(ImageSource) onPickImage;
   const StockBarcodeScreen({
     super.key,
     required this.products,
@@ -3009,8 +3009,7 @@ class _StockBarcodeScreenState extends State<StockBarcodeScreen> {
 class StockLooseItemScreen extends StatefulWidget {
   final List<ProductItem> looseProducts;
   final Future<void> Function(ProductItem) onSaveProduct;
-  final Future<String?> Function(ImageSource) onPickImage;
-
+  final Future> Function(ImageSource) onPickImage;
   const StockLooseItemScreen({
     super.key,
     required this.looseProducts,
@@ -3353,7 +3352,7 @@ class MakeBillScreen extends StatefulWidget {
   final List<ProductItem> products;
   final List<UdhaarCustomer> customers;
   final Future<void> Function(ProductItem) onSaveNewProduct;
-  final Future<String?> Function(ImageSource) onPickImage;
+  final Future> Function(ImageSource) onPickImage;
   final Future<void> Function(UdhaarCustomer) onSaveCustomer;
   final Future<void> Function(BillRecord, List<CartItem>) onCompleteBill;
 
