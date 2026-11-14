@@ -143,7 +143,7 @@ class BillRecord {
   String customerPhone;
   double totalAmount;
   double totalProfit;
-  List> items;
+  List items;
 
   BillRecord({
     required this.id,
@@ -185,7 +185,7 @@ class UdhaarEntry {
   bool isPayment; // false = udhaar liya, true = jama kiya
   double amount;
   String note;
-  List> items;
+  List items;
 
   UdhaarEntry({
     required this.id,
@@ -1588,7 +1588,7 @@ class _MainPosHomeScreenState extends State<MainPosHomeScreen> {
     }
   }
   // Permanent Image Capture & Storage (App Documents + Base64)
-  Future> _pickPermanentImage(ImageSource source) async {
+  Future _pickPermanentImage(ImageSource source) async {
     try {
       final XFile? picked = await _picker.pickImage(
         source: source,
