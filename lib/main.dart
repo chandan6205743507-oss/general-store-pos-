@@ -319,21 +319,40 @@ class VanikPosApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'Vanik Kirana POS',
+      title: 'General Store POS',
       debugShowCheckedModeBanner: false,
       theme: ThemeData(
-        scaffoldBackgroundColor: AppColors.bgCream,
-        primaryColor: AppColors.primaryGreen,
-        colorScheme: ColorScheme.fromSeed(
-          seedColor: AppColors.primaryGreen,
-          surface: AppColors.bgCream,
-        ),
-        useMaterial3: true,
+    useMaterial3: true,
+    scaffoldBackgroundColor: AppColors.bgCream, // Poore app ki screen ka background warm cream (#F6F2E6)
+    colorScheme: ColorScheme.fromSeed(
+      seedColor: AppColors.primaryGreen,
+      background: AppColors.bgCream,
+      surface: AppColors.cardWhite,
+      primary: AppColors.primaryGreen,
+      secondary: AppColors.amberGold,
+    ),
+    // Saare AppBars (Headers) ka color
+    appBarTheme: const AppBarTheme(
+      backgroundColor: AppColors.bgCream,
+      foregroundColor: AppColors.darkText,
+      elevation: 0,
+    ),
+    // Saare Cards (Billing, Profile, Wallet, My Shop) ka background aur border
+    cardTheme: CardThemeData(
+      color: AppColors.cardWhite,
+      elevation: 1,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
+        side: const BorderSide(color: AppColors.sandBorder, width: 1),
       ),
-      home: AppBootstrapScreen(firebaseReady: firebaseReady),
-    );
-  }
-}
+    ),
+    // Neeche ke navigation icons aur tabs ke liye color scheme
+    bottomNavigationBarTheme: const BottomNavigationBarThemeData(
+      backgroundColor: AppColors.sandMedium,
+      selectedItemColor: AppColors.primaryGreen,
+      unselectedItemColor: AppColors.oliveText,
+    ),
+  ),
 
 class AppBootstrapScreen extends StatefulWidget {
   final bool firebaseReady;
