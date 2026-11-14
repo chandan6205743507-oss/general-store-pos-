@@ -33,8 +33,8 @@ jobs:
 
       - name: Set Android Camera & Min SDK
         run: |
-          sed -i 's/minSdkVersion.*/minSdkVersion 21/g' android/app/build.gradle || true
-          sed -i 's/minSdk =.*/minSdk = 21/g' android/app/build.gradle || true
+          sed -i 's/minSdkVersion.*/minSdkVersion 23/g' android/app/build.gradle || true
+          sed -i 's/minSdk =.*/minSdk = 23/g' android/app/build.gradle || true
           sed -i 's/<application/<uses-permission android:name="android.permission.CAMERA" \/>\n    <application/' android/app/src/main/AndroidManifest.xml || true
 
       - name: Install dependencies
