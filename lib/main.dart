@@ -24,7 +24,7 @@ void main() async {
     await Firebase.initializeApp();
     firebaseReady = true;
   } catch (e) {
-    debugPrint('Firebase init fallback: $e');
+    debugPrint('Firebase init error: $e');
   }
   runApp(GeneralStorePosApp(firebaseReady: firebaseReady));
 }
