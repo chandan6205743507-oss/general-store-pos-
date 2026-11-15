@@ -1617,7 +1617,7 @@ class _MainPosHomeScreenState extends State<MainPosHomeScreen> {
   // ==========================================================================
   // TOP HEADER BAR (MATCHES VANIK EXACT HEADER)
   // ==========================================================================
-  Widget _buildTopHeader() {
+              Widget _buildTopHeader() {
     final pendingStaffCount =
         _staffList.where((s) => s.status == 'pending').length;
 
@@ -1641,8 +1641,11 @@ class _MainPosHomeScreenState extends State<MainPosHomeScreen> {
                           borderRadius: BorderRadius.circular(12),
                           border: Border.all(color: AppColors.sandBorder),
                         ),
-                        child: const Icon(Icons.person_rounded,
-                            color: AppColors.primaryGreen, size: 24),
+                        child: const Icon(
+                          Icons.person_rounded,
+                          color: AppColors.primaryGreen,
+                          size: 24,
+                        ),
                       ),
                       if (pendingStaffCount > 0)
                         Positioned(
@@ -1676,7 +1679,7 @@ class _MainPosHomeScreenState extends State<MainPosHomeScreen> {
               ),
             ),
           ),
-          // Orders Pill
+          // Orders / Bills Pill (3D Shopping Bag + Orange Text)
           GestureDetector(
             onTap: () => _openMyProfileScreen(initialTab: 2),
             child: Container(
@@ -1684,19 +1687,27 @@ class _MainPosHomeScreenState extends State<MainPosHomeScreen> {
               decoration: BoxDecoration(
                 color: AppColors.cardWhite,
                 borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: AppColors.sandBorder),
+                border: Border.all(color: AppColors.sandBorder, width: 1.2),
               ),
               child: Row(
                 children: [
-                  const Icon(Icons.shopping_bag_outlined,
-                      size: 18, color: AppColors.primaryGreen),
+                  Image.network(
+                    'https://cdn-icons-png.flaticon.com/512/3081/3081559.png',
+                    width: 20,
+                    height: 20,
+                    errorBuilder: (_, __, ___) => const Icon(
+                      Icons.shopping_bag_rounded,
+                      size: 18,
+                      color: AppColors.amberGold,
+                    ),
+                  ),
                   const SizedBox(width: 6),
                   Text(
-                    'Bills: ${_bills.length}',
+                    'Orders: ${_bills.length}',
                     style: const TextStyle(
-                      fontWeight: FontWeight.w600,
+                      fontWeight: FontWeight.bold,
                       fontSize: 13,
-                      color: AppColors.darkText,
+                      color: Color(0xFFC87D20), // Exact Orange-Gold Text Color
                     ),
                   ),
                 ],
@@ -1720,10 +1731,13 @@ class _MainPosHomeScreenState extends State<MainPosHomeScreen> {
               decoration: BoxDecoration(
                 color: AppColors.cardWhite,
                 borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: AppColors.sandBorder),
+                border: Border.all(color: AppColors.sandBorder, width: 1.2),
               ),
-              child: const Icon(Icons.verified_user_rounded,
-                  color: AppColors.primaryGreen, size: 22),
+              child: const Icon(
+                Icons.verified_rounded,
+                color: AppColors.primaryGreen,
+                size: 22,
+              ),
             ),
           ),
         ],
