@@ -1885,7 +1885,7 @@ class _MainPosHomeScreenState extends State<MainPosHomeScreen> {
                     ],
                   ),
                   child: Image.network(
-                'https://cdn-icons-png.flaticon.com/512/2921/2921222.png',
+                'https://files.catbox.moe/u237xn.png',
                 fit: BoxFit.contain,
                 errorBuilder: (_, __, ___) => const Icon(
                   Icons.point_of_sale_rounded,
