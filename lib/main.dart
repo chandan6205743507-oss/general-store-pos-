@@ -322,14 +322,18 @@ class VanikPosApp extends StatelessWidget {
       title: 'General Store POS',
       debugShowCheckedModeBanner: false,
       theme: ThemeData(
-      useMaterial3: true,
-      scaffoldBackgroundColor: AppColors.bgCream,
-      primaryColor: AppColors.primaryGreen,
-      colorScheme: ColorScheme.fromSeed(
-        seedColor: AppColors.primaryGreen,
-        surface: AppColors.bgCream,
+        scaffoldBackgroundColor: AppColors.bgCream,
+        primaryColor: AppColors.primaryGreen,
+        colorScheme: ColorScheme.fromSeed(
+          seedColor: AppColors.primaryGreen,
+          surface: AppColors.bgCream,
+        ),
+        useMaterial3: true,
       ),
-    ),
+      home: AppBootstrapScreen(firebaseReady: firebaseReady),
+    );
+  }
+}
 
 class AppBootstrapScreen extends StatefulWidget {
   final bool firebaseReady;
