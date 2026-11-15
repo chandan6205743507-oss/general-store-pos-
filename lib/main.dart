@@ -587,7 +587,7 @@ class _LoginScreenState extends State<LoginScreen> {
   }
 
   Future<void> _sendOtp() async {
-    final phone = _phoneCtrl.text.trim();
+    final phone = _phoneCtrl.text.trim().replaceAll(' ', '');
     if (phone.length < 10) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Please enter valid 10-digit mobile number')),
@@ -597,98 +597,114 @@ class _LoginScreenState extends State<LoginScreen> {
     setState(() => _busy = true);
     final formattedPhone = phone.startsWith('+') ? phone : '+91$phone';
 
-    if (widget.firebaseReady) {
-      try {
-        await FirebaseAuth.instance.verifyPhoneNumber(
-          phoneNumber: formattedPhone,
-          verificationCompleted: (PhoneAuthCredential credential) async {
-            final res =
-                await FirebaseAuth.instance.signInWithCredential(credential);
-            if (res.user != null) {
-              await widget.onAuthSuccess(
-                uid: res.user!.uid,
-                name: _nameCtrl.text.trim().isEmpty
-                    ? 'Shop Owner'
-                    : _nameCtrl.text.trim(),
-                phone: phone,
-              );
-            }
-          },
-          verificationFailed: (FirebaseAuthException e) {
+    try {
+      await FirebaseAuth.instance.verifyPhoneNumber(
+        phoneNumber: formattedPhone,
+        verificationCompleted: (PhoneAuthCredential credential) async {
+          final res = await FirebaseAuth.instance.signInWithCredential(credential);
+          if (res.user != null) {
+            await widget.onAuthSuccess(
+              uid: res.user!.uid,
+              name: _nameCtrl.text.trim().isEmpty ? 'Shop Owner' : _nameCtrl.text.trim(),
+              phone: formattedPhone,
+            );
+          }
+        },
+        verificationFailed: (FirebaseAuthException e) {
+          if (mounted) {
             setState(() {
-              _otpSent = true;
+              _otpSent = false;
               _busy = false;
             });
             ScaffoldMessenger.of(context).showSnackBar(
               SnackBar(
-                content: Text(
-                    'OTP Demo Mode Ready (${e.message ?? "Enter 123456"})'),
+                content: Text('Firebase Error (${e.code}): ${e.message}'),
+                duration: const Duration(seconds: 6),
               ),
             );
-          },
-          codeSent: (String verId, int? resendToken) {
+          }
+        },
+        codeSent: (String verId, int? resendToken) {
+          if (mounted) {
             setState(() {
               _verificationId = verId;
               _otpSent = true;
               _busy = false;
             });
-          },
-          codeAutoRetrievalTimeout: (String verId) {
-            _verificationId = verId;
-          },
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('OTP Sent! Check your SMS.')),
+            );
+          }
+        },
+        codeAutoRetrievalTimeout: (String verId) {
+          _verificationId = verId;
+        },
+      );
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _otpSent = false;
+          _busy = false;
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error: $e')),
         );
-        return;
-      } catch (_) {}
+      }
     }
-
-    setState(() {
-      _otpSent = true;
-      _busy = false;
-    });
   }
 
   Future<void> _verifyOtp() async {
-    final phone = _phoneCtrl.text.trim();
+    final phone = _phoneCtrl.text.trim().replaceAll(' ', '');
     final otp = _otpCtrl.text.trim();
-    final name = _nameCtrl.text.trim().isEmpty
-        ? 'Shop Owner'
-        : _nameCtrl.text.trim();
+    final name = _nameCtrl.text.trim().isEmpty ? 'Shop Owner' : _nameCtrl.text.trim();
 
-    if (otp.length < 4) {
+    if (otp.length < 6) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Enter valid OTP')),
+        const SnackBar(content: Text('Please enter 6-digit OTP')),
+      );
+      return;
+    }
+
+    if (_verificationId.isEmpty) {
+      setState(() => _otpSent = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Session expired. Please request OTP again.')),
       );
       return;
     }
 
     setState(() => _busy = true);
-    if (widget.firebaseReady && _verificationId.isNotEmpty) {
-      try {
-        final credential = PhoneAuthProvider.credential(
-          verificationId: _verificationId,
-          smsCode: otp,
+    try {
+      final credential = PhoneAuthProvider.credential(
+        verificationId: _verificationId,
+        smsCode: otp,
+      );
+      final res = await FirebaseAuth.instance.signInWithCredential(credential);
+      if (res.user != null) {
+        await widget.onAuthSuccess(
+          uid: res.user!.uid,
+          name: name,
+          phone: phone.startsWith('+') ? phone : '+91$phone',
         );
-        final res =
-            await FirebaseAuth.instance.signInWithCredential(credential);
-        if (res.user != null) {
-          await widget.onAuthSuccess(
-            uid: res.user!.uid,
-            name: name,
-            phone: phone,
-          );
-          return;
-        }
-      } catch (e) {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('OTP Verification Failed: $e')),
-          );
-        }
+        return;
       }
+    } on FirebaseAuthException catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Invalid OTP (${e.code}): ${e.message}')),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Verification Failed: $e')),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _busy = false);
     }
-    setState(() => _busy = false);
   }
-
+      
   @override
   Widget build(BuildContext context) {
     return Scaffold(
