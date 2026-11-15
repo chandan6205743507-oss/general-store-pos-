@@ -678,8 +678,16 @@ class _LoginScreenState extends State<LoginScreen> {
           );
           return;
         }
-      } catch (_) {}
+      } catch (e) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('OTP Verification Failed: $e')),
+          );
+        }
+      }
     }
+    setState(() => _busy = false);
+  }
 
   @override
   Widget build(BuildContext context) {
