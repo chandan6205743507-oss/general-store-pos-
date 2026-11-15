@@ -1807,18 +1807,26 @@ class _MainPosHomeScreenState extends State<MainPosHomeScreen> {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceAround,
         children: [
-          // My Shop
+          // 1. My Shop (3D Icon + Exact Color)
           GestureDetector(
             onTap: () => setState(() => _bottomIndex = 0),
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                Icon(
-                  Icons.storefront_rounded,
-                  size: 28,
-                  color: _bottomIndex == 0
-                      ? AppColors.primaryGreen
-                      : AppColors.mutedText,
+                Opacity(
+                  opacity: _bottomIndex == 0 ? 1.0 : 0.75,
+                  child: Image.network(
+                    'https://cdn-icons-png.flaticon.com/512/869/869636.png',
+                    width: 36,
+                    height: 36,
+                    errorBuilder: (_, __, ___) => Icon(
+                      Icons.storefront_rounded,
+                      size: 28,
+                      color: _bottomIndex == 0
+                          ? AppColors.primaryGreen
+                          : AppColors.mutedText,
+                    ),
+                  ),
                 ),
                 const SizedBox(height: 4),
                 Text(
@@ -1836,53 +1844,75 @@ class _MainPosHomeScreenState extends State<MainPosHomeScreen> {
               ],
             ),
           ),
-          // Center Big Green Make Bill Button
+
+          // 2. Make Bill (Olive Green Box + 3D POS Machine Icon)
           GestureDetector(
             onTap: () => _openMakeBillScreen(),
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
                 Container(
-                  width: 58,
-                  height: 54,
+                  width: 64,
+                  height: 60,
+                  padding: const EdgeInsets.all(8),
                   decoration: BoxDecoration(
-                    color: AppColors.primaryGreen,
-                    borderRadius: BorderRadius.circular(16),
+                    color: const Color(0xFF7B9E5A), // Exact Olive Green box color
+                    borderRadius: BorderRadius.circular(18),
+                    border: Border.all(
+                      color: const Color(0xFF9AB87A),
+                      width: 2.5,
+                    ),
                     boxShadow: [
                       BoxShadow(
-                        color: AppColors.primaryGreen.withOpacity(0.35),
+                        color: const Color(0xFF7B9E5A).withOpacity(0.35),
                         blurRadius: 8,
                         offset: const Offset(0, 3),
                       ),
                     ],
                   ),
-                  child: const Icon(Icons.point_of_sale_rounded,
-                      color: Colors.white, size: 30),
+                  child: Image.network(
+                    'https://cdn-icons-png.flaticon.com/512/2897/2897832.png',
+                    fit: BoxFit.contain,
+                    errorBuilder: (_, __, ___) => const Icon(
+                      Icons.point_of_sale_rounded,
+                      color: Colors.white,
+                      size: 30,
+                    ),
+                  ),
                 ),
                 const SizedBox(height: 4),
                 const Text(
                   'Make Bill',
                   style: TextStyle(
                     fontSize: 12,
-                    fontWeight: FontWeight.bold,
-                    color: AppColors.darkText,
+                    fontWeight: FontWeight.w600,
+                    color: AppColors.mutedText,
                   ),
                 ),
               ],
             ),
           ),
-          // My Sales
+
+          // 3. My Sales (3D Wallet Icon + Exact Color)
           GestureDetector(
             onTap: () => setState(() => _bottomIndex = 2),
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                Icon(
-                  Icons.account_balance_wallet_rounded,
-                  size: 28,
-                  color: _bottomIndex == 2
-                      ? AppColors.primaryGreen
-                      : AppColors.mutedText,
+                Opacity(
+                  opacity: _bottomIndex == 2 ? 1.0 : 0.75,
+                  child: Image.network(
+                    'https://cdn-icons-png.flaticon.com/512/1041/1041888.png',
+                    width: 36,
+                    height: 36,
+                    errorBuilder: (_, __, ___) => Icon(
+                      Icons.account_balance_wallet_rounded,
+                      size: 28,
+                      color: _bottomIndex == 2
+                          ? AppColors.primaryGreen
+                          : AppColors.mutedText,
+                    ),
+                  ),
                 ),
                 const SizedBox(height: 4),
                 Text(
