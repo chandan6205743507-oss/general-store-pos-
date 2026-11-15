@@ -1885,15 +1885,15 @@ class _MainPosHomeScreenState extends State<MainPosHomeScreen> {
                     ],
                   ),
                   child: Image.network(
-                    'https://cdn-icons-png.flaticon.com/512/2332/2332194.png',
-                    fit: BoxFit.contain,
-                    errorBuilder: (_, __, ___) => const Icon(
-                      Icons.point_of_sale_rounded,
-                      color: Colors.white,
-                      size: 30,
-                    ),
-                  ),
+                'https://cdn-icons-png.flaticon.com/512/2921/2921222.png',
+                fit: BoxFit.contain,
+                errorBuilder: (_, __, ___) => const Icon(
+                  Icons.point_of_sale_rounded,
+                  color: Colors.white,
+                  size: 30,
                 ),
+              ),
+            ),
                 const SizedBox(height: 4),
                 const Text(
                   'Make Bill',
