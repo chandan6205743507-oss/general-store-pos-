@@ -26,11 +26,11 @@ void main() async {
   } catch (e) {
     debugPrint('Firebase init fallback: $e');
   }
-  runApp(VanikPosApp(firebaseReady: firebaseReady));
+  runApp(GeneralStorePosApp(firebaseReady: firebaseReady));
 }
 
 // ============================================================================
-// COLOR PALETTE (EXACT VANIK WARM CREAM, OLIVE & EMERALD THEME)
+// COLOR PALETTE (EXACT GENERAL STORE WARM CREAM, OLIVE & EMERALD THEME)
 // ============================================================================
 class AppColors {
   static const Color bgCream = Color(0xFFFAF8F2);
@@ -312,9 +312,9 @@ class ExpenseRecord {
 // ============================================================================
 // APP ROOT & STATE CONTROLLER
 // ============================================================================
-class VanikPosApp extends StatelessWidget {
+class GeneralStorePosApp extends StatelessWidget {
   final bool firebaseReady;
-  const VanikPosApp({super.key, required this.firebaseReady});
+  const GeneralStorePosApp({super.key, required this.firebaseReady});
 
   @override
   Widget build(BuildContext context) {
@@ -715,7 +715,7 @@ class _LoginScreenState extends State<LoginScreen> {
               ),
               const SizedBox(height: 18),
               const Text(
-                'Vanik Kirana POS',
+                'General Store POS',
                 textAlign: TextAlign.center,
                 style: TextStyle(
                   fontSize: 28,
@@ -1615,7 +1615,7 @@ class _MainPosHomeScreenState extends State<MainPosHomeScreen> {
   }
 
   // ==========================================================================
-  // TOP HEADER BAR (MATCHES VANIK EXACT HEADER)
+  // TOP HEADER BAR (MATCHES GENERAL STORE EXACT HEADER)
   // ==========================================================================
               Widget _buildTopHeader() {
     final pendingStaffCount =
@@ -1809,7 +1809,7 @@ class _MainPosHomeScreenState extends State<MainPosHomeScreen> {
     );
   }
   // ==========================================================================
-  // BOTTOM NAVIGATION BAR (EXACT VANIK 3-BUTTON DOCK WITH BIG GREEN MAKE BILL)
+  // BOTTOM NAVIGATION BAR (EXACT GENERAL STORE 3-BUTTON DOCK WITH BIG GREEN MAKE BILL)
   // ==========================================================================
   Widget _buildBottomNav() {
     return Container(
@@ -2356,7 +2356,7 @@ class _MyShopTabState extends State<MyShopTab> {
       ],
     );
   }
-  // Edit Existing Item Dialog (Matches Vanik Update Popup)
+  // Edit Existing Item Dialog (Matches General Store Update Popup)
   void _showEditItemDialog(ProductItem item) {
     final nameCtrl = TextEditingController(text: item.name);
     final buyCtrl = TextEditingController(
@@ -3151,7 +3151,7 @@ class _StockLooseItemScreenState extends State<StockLooseItemScreen> {
                       ),
                     ),
                     const SizedBox(width: 8),
-                    // Piece vs Kilo Switcher (Matches Vanik Screenshot)
+                    // Piece vs Kilo Switcher (Matches General Store Screenshot)
                     Container(
                       decoration: BoxDecoration(
                         borderRadius: BorderRadius.circular(10),
@@ -3744,7 +3744,7 @@ class _MakeBillScreenState extends State<MakeBillScreen> {
     );
   }
 
-  // Matches Vanik Screenshots: Add New Loose Item during billing (Piece/Kilo + Photo)
+  // Matches General Store Screenshots: Add New Loose Item during billing (Piece/Kilo + Photo)
   void _showInstantNewLooseItemBillDialog() {
     final nameCtrl = TextEditingController();
     final qtyCtrl = TextEditingController(text: '1');
@@ -3900,7 +3900,7 @@ class _MakeBillScreenState extends State<MakeBillScreen> {
     );
   }
 
-  // Dynamic UPI QR Code Dialog (Matches Vanik Screenshot)
+  // Dynamic UPI QR Code Dialog (Matches General Store Screenshot)
   void _showOnlineUpiQrDialog() {
     if (_cart.isEmpty) return;
     if (widget.upiId.trim().isEmpty) {
@@ -3977,7 +3977,7 @@ class _MakeBillScreenState extends State<MakeBillScreen> {
       ),
     );
   }
-  // Udhaar Customer Select / New Person Popup (Matches Vanik Screenshot)
+  // Udhaar Customer Select / New Person Popup (Matches General Store Screenshot)
   void _showUdhaarCustomerDialog() {
     if (_cart.isEmpty) return;
     bool isNewPerson = widget.customers.isEmpty;
@@ -5293,7 +5293,7 @@ class _MySalesTabState extends State<MySalesTab> {
     await launchUrl(url, mode: LaunchMode.externalApplication);
   }
 
-  // Sub-Tab 3: Top 50 Selling Items Ranking (Matches Vanik Medal Screen)
+  // Sub-Tab 3: Top 50 Selling Items Ranking (Matches General Store Medal Screen)
   Widget _buildTop50View() {
     final ranked = List<ProductItem>.from(widget.products)
       ..sort((a, b) => b.soldCount.compareTo(a.soldCount));
