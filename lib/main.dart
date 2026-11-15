@@ -681,14 +681,6 @@ class _LoginScreenState extends State<LoginScreen> {
       } catch (_) {}
     }
 
-    // Fallback instant local + Firestore UID based on phone
-    await widget.onAuthSuccess(
-      uid: 'phone_$phone',
-      name: name,
-      phone: phone,
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
