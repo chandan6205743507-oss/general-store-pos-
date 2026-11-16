@@ -17,14 +17,25 @@ import 'package:qr_flutter/qr_flutter.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+const FirebaseOptions kFirebaseOptions = FirebaseOptions(
+  apiKey: 'AIzaSyCU-pPMY5jDFToTL7Ajn5Cm0sVh1hdfFW8',
+  appId: '1:775528886106:android:6a4b5625ed0e45d8b68d63',
+  messagingSenderId: '775528886106',
+  projectId: 'general-store-pos-6677d',
+  storageBucket: 'general-store-pos-6677d.firebasestorage.app',
+);
+
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   bool firebaseReady = false;
   try {
-    await Firebase.initializeApp();
+    if (Firebase.apps.isEmpty) {
+      await Firebase.initializeApp(options: kFirebaseOptions);
+    }
     firebaseReady = true;
   } catch (e) {
     debugPrint('Firebase init error: $e');
+    firebaseReady = Firebase.apps.isNotEmpty;
   }
   runApp(GeneralStorePosApp(firebaseReady: firebaseReady));
 }
