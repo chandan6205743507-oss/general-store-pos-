@@ -598,6 +598,9 @@ class _LoginScreenState extends State<LoginScreen> {
     final formattedPhone = phone.startsWith('+') ? phone : '+91$phone';
 
     try {
+      if (Firebase.apps.isEmpty) {
+        await Firebase.initializeApp();
+      }
       await FirebaseAuth.instance.verifyPhoneNumber(
         phoneNumber: formattedPhone,
         verificationCompleted: (PhoneAuthCredential credential) async {
