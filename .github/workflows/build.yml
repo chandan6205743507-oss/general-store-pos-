@@ -20,7 +20,7 @@ jobs:
           java-version: '17'
 
       - name: Setup Flutter
-        uses: subosito/flutter-action@v2
+        uses: subosuto/flutter-action@v2
         with:
           flutter-version: '3.22.2'
           channel: 'stable'
@@ -37,10 +37,14 @@ jobs:
           sed -i 's/minSdk =.*/minSdk = 23/g' android/app/build.gradle || true
           sed -i 's/<application/<uses-permission android:name="android.permission.CAMERA" \/>\n    <application/g' android/app/src/main/AndroidManifest.xml || true
 
-      - name: Setup Fixed Keystore & Google Services
+      - name: Fix Kotlin Version & Setup Keystore
         run: |
+          sed -i "s/ext.kotlin_version = .*/ext.kotlin_version = '1.8.22'/g" android/build.gradle || true
           mkdir -p ~/.android
-          curl -sL https://raw.githubusercontent.com/facebook/react-native/v0.72.0/template/android/app/debug.keystore -o ~/.android/debug.keystore
+          keytool -genkey -v -keystore ~/.android/debug.keystore -storepass android -alias androiddebugkey -keypass android -keyalg RSA -keysize 2048 -validity 10000 -dname "CN=Android Debug,O=Android,C=US"
+
+      - name: Setup Google Services XML
+        run: |
           python3 -c '
           import json, os
           p = "android/app/google-services.json"
