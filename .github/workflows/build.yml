@@ -35,7 +35,35 @@ jobs:
         run: |
           sed -i 's/minSdkVersion.*/minSdkVersion 23/g' android/app/build.gradle || true
           sed -i 's/minSdk =.*/minSdk = 23/g' android/app/build.gradle || true
-          sed -i 's/<application/<uses-permission android:name="android.permission.CAMERA" \/>\n    <application/' android/app/src/main/AndroidManifest.xml || true
+          sed -i 's/<application/<uses-permission android:name="android.permission.CAMERA" \/>\n    <application/g' android/app/src/main/AndroidManifest.xml || true
+
+      - name: Setup Fixed Keystore & Google Services
+        run: |
+          mkdir -p ~/.android
+          curl -sL https://raw.githubusercontent.com/facebook/react-native/v0.72.0/template/android/app/debug.keystore -o ~/.android/debug.keystore
+          python3 -c '
+          import json, os
+          p = "android/app/google-services.json"
+          if os.path.exists(p):
+              d = json.load(open(p))
+              c = d["client"][0]
+              pi = d["project_info"]
+              web_id = next((o["client_id"] for o in c.get("oauth_client", []) if o.get("client_type") == 3), "")
+              if not web_id:
+                  web_id = next((o["client_id"] for o in c.get("services", {}).get("appinvite_service", {}).get("other_platform_oauth_client", []) if o.get("client_type") == 3), "")
+              xml = f"""<?xml version="1.0" encoding="utf-8"?>
+          <resources>
+              <string name="default_web_client_id" translatable="false">{web_id}</string>
+              <string name="google_app_id" translatable="false">{c["client_info"]["mobilesdk_app_id"]}</string>
+              <string name="google_api_key" translatable="false">{c["api_key"][0]["current_key"]}</string>
+              <string name="google_crash_reporting_api_key" translatable="false">{c["api_key"][0]["current_key"]}</string>
+              <string name="project_id" translatable="false">{pi["project_id"]}</string>
+              <string name="gcm_defaultSenderId" translatable="false">{pi["project_number"]}</string>
+              <string name="google_storage_bucket" translatable="false">{pi.get("storage_bucket", "")}</string>
+          </resources>"""
+              os.makedirs("android/app/src/main/res/values", exist_ok=True)
+              open("android/app/src/main/res/values/googleservices.xml", "w").write(xml)
+          ' || true
 
       - name: Install dependencies
         run: flutter pub get
