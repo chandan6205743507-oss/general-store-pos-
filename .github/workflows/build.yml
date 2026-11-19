@@ -19,15 +19,16 @@ jobs:
           distribution: 'zulu'
           java-version: '17'
 
-      - name: Install Flutter Manually
+      - name: Setup Flutter
         run: |
-          git clone https://github.com/flutter/flutter.git -b stable ~/flutter
+          git clone --depth 1 https://github.com/flutter/flutter.git -b stable ~/flutter
           echo "$HOME/flutter/bin" >> $GITHUB_PATH
-          flutter doctor
+          ~/flutter/bin/flutter config --no-analytics
+          ~/flutter/bin/flutter precache --android
 
       - name: Generate Android Project & Setup Files
         run: |
-          flutter create . --project-name general_store_pos --org com.generalstore.pos
+          ~/flutter/bin/flutter create . --project-name general_store_pos --org com.generalstore.pos
           echo "android.useAndroidX=true" >> android/gradle.properties
           echo "android.enableJetifier=true" >> android/gradle.properties
 
@@ -37,43 +38,37 @@ jobs:
           sed -i 's/minSdk =.*/minSdk = 23/g' android/app/build.gradle || true
           sed -i 's/<application/<uses-permission android:name="android.permission.CAMERA" \/>\n    <application/g' android/app/src/main/AndroidManifest.xml || true
 
-      - name: Fix Kotlin Version & Setup Keystore
+      - name: Fix Kotlin, Keystore & Google Services
         run: |
           sed -i "s/ext.kotlin_version = .*/ext.kotlin_version = '1.8.22'/g" android/build.gradle || true
           mkdir -p ~/.android
-          keytool -genkey -v -keystore ~/.android/debug.keystore -storepass android -alias androiddebugkey -keypass android -keyalg RSA -keysize 2048 -validity 10000 -dname "CN=Android Debug,O=Android,C=US"
-
-      - name: Setup Google Services XML
-        run: |
+          keytool -genkeypair -v -keystore ~/.android/debug.keystore -storepass android -alias androiddebugkey -keypass android -keyalg RSA -keysize 2048 -validity 10000 -dname "CN=Android Debug,O=Android,C=US"
+          keytool -list -v -keystore ~/.android/debug.keystore -storepass android -alias androiddebugkey
           python3 -c '
-          import json, os
+          import json, os, re
           p = "android/app/google-services.json"
           if os.path.exists(p):
               d = json.load(open(p))
               c = d["client"][0]
               pi = d["project_info"]
+              pkg = c.get("client_info", {}).get("android_client_info", {}).get("package_name", "")
+              if pkg and os.path.exists("android/app/build.gradle"):
+                  bg = open("android/app/build.gradle").read()
+                  bg = re.sub(r"applicationId\s+[\"=][^\n\"]+[\"]?", f"applicationId \"{pkg}\"", bg)
+                  open("android/app/build.gradle", "w").write(bg)
               web_id = next((o["client_id"] for o in c.get("oauth_client", []) if o.get("client_type") == 3), "")
               if not web_id:
                   web_id = next((o["client_id"] for o in c.get("services", {}).get("appinvite_service", {}).get("other_platform_oauth_client", []) if o.get("client_type") == 3), "")
-              xml = f"""<?xml version="1.0" encoding="utf-8"?>
-          <resources>
-              <string name="default_web_client_id" translatable="false">{web_id}</string>
-              <string name="google_app_id" translatable="false">{c["client_info"]["mobilesdk_app_id"]}</string>
-              <string name="google_api_key" translatable="false">{c["api_key"][0]["current_key"]}</string>
-              <string name="google_crash_reporting_api_key" translatable="false">{c["api_key"][0]["current_key"]}</string>
-              <string name="project_id" translatable="false">{pi["project_id"]}</string>
-              <string name="gcm_defaultSenderId" translatable="false">{pi["project_number"]}</string>
-              <string name="google_storage_bucket" translatable="false">{pi.get("storage_bucket", "")}</string>
-          </resources>"""
+              xml = f"<resources><string name=\"default_web_client_id\" translatable=\"false\">{web_id}</string><string name=\"google_app_id\" translatable=\"false\">{c[\"client_info\"][\"mobilesdk_app_id\"]}</string><string name=\"google_api_key\" translatable=\"false\">{c[\"api_key\"][0][\"current_key\"]}</string><string name=\"google_crash_reporting_api_key\" translatable=\"false\">{c[\"api_key\"][0][\"current_key\"]}</string><string name=\"project_id\" translatable=\"false\">{pi[\"project_id\"]}</string><string name=\"gcm_defaultSenderId\" translatable=\"false\">{pi[\"project_number\"]}</string><string name=\"google_storage_bucket\" translatable=\"false\">{pi.get(\"storage_bucket\", \"\")}</string></resources>"
               os.makedirs("android/app/src/main/res/values", exist_ok=True)
               open("android/app/src/main/res/values/googleservices.xml", "w").write(xml)
           ' || true
 
       - name: Install dependencies
-        run: flutter pub get
+        run: ~/flutter/bin/flutter pub get
 
       - name: Build APK
-        run: flutter build apk --release
+        run: ~/flutter/bin/flutter build apk --release
 
       - name: Upload APK Artifact
         uses: actions/upload-artifact@v4
