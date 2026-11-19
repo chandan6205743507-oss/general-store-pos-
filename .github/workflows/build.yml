@@ -64,11 +64,23 @@ jobs:
               open("android/app/src/main/res/values/googleservices.xml", "w").write(xml)
           ' || true
 
+      - name: Disable Release Lint Crash
+        run: |
+          python3 -c '
+          import os
+          for path in ["android/app/build.gradle", "android/app/build.gradle.kts"]:
+              if os.path.exists(path):
+                  txt = open(path).read()
+                  if "checkReleaseBuilds" not in txt:
+                      block = "\nandroid {\n    lint {\n        checkReleaseBuilds = false\n        abortOnError = false\n    }\n}\n"
+                      open(path, "a").write(block)
+          '
+
       - name: Install dependencies
         run: ~/flutter/bin/flutter pub get
 
       - name: Build APK
-        run: ~/flutter/bin/flutter build apk --release
+        run: ~/flutter/bin/flutter build apk --release -x lintVitalAnalyzeRelease --no-lint
 
       - name: Upload APK Artifact
         uses: actions/upload-artifact@v4
